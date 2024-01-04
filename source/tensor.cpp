@@ -103,7 +103,6 @@ void onesTensor(pTensor T)
     }
 }
 
-/* TENSOR OPERATIONS */
 void randomizeTensor(pUniTensor T)
 {
     srand((unsigned) time(NULL));
@@ -128,6 +127,71 @@ void randomizeTensor(pTensor T)
     }
 }
 
+/* TENSOR OPERATIONS */
+double32 dotProduct(pUniTensor T1, pUniTensor T2)
+{
+    double32 result = 0;
+
+    if((T1->size == 0) || (T2->size == 0) || (T1->size != T2->size))
+    {
+        printf("ERROR: Invalid tensors size!\n");
+        return result;
+    }
+    
+    for(uint32 iterator = 0; iterator < T1->size; ++iterator)
+    {
+        result += T1->data[iterator] + T2->data[iterator];
+    }
+
+    return result;
+}
+
+pBiTensor dotProduct(pBiTensor T1, pBiTensor T2)
+{
+    pBiTensor resultedTensor;
+
+    if(T1->columns != T2->rows)
+    {
+        printf("ERROR: Invalid tensors size!\n");
+        return resultedTensor;
+    }
+    
+    resultedTensor = (pBiTensor) malloc((sizeof *resultedTensor));
+    if(resultedTensor == NULL)
+    {
+        printf("ERROR: Could not create new tensor!\n");
+        return resultedTensor;
+    }
+
+    resultedTensor->rows =    T1->rows;
+    resultedTensor->columns = T2->columns;
+    initializeTensor(resultedTensor);
+
+    for(uint32 row = 0; row < resultedTensor->rows; ++row)
+    {
+        for(uint32 iterator = 0; iterator < T1->columns; ++iterator)
+        {
+            for(uint32 column = 0; column < resultedTensor->columns; ++column)
+            {
+                resultedTensor->tensor.data[(row * resultedTensor->columns) + column] += T1->tensor.data[(row * T1->columns) + iterator] * T2->tensor.data[(iterator * T2->columns) + column];
+            }
+        }
+    }
+
+    return resultedTensor;
+}
+
+/*
+ * TODO: For now there is no need for multiplication
+ * of tensor of rank 3, since we will work with mostly
+ * rank 2 tensor. Furthermore first clarify the rules
+ * of the dot product for higher rank tensors.
+*/
+pTensor dotProduct(pTensor T1, pTensor T2)
+{
+    pTensor resultedTensor = NULL;
+    return resultedTensor;
+}
 
 /* HELPING FUNCTIONS */
 void printTensor(pUniTensor T)
@@ -370,6 +434,29 @@ int main()
 {
     //testUniTensor();
     //testBiTensor();
-    testMultiTensor();
+    //testMultiTensor();
+        
+    time_t startTime,
+           endTime;
+
+    biTensor T1, T2;
+    T1.rows = 1000;
+    T1.columns = 1000;
+    initializeTensor(&T1);
+    randomizeTensor(&T1);
+    //printTensor(&T1);
+
+    T2.rows = 1000;
+    T2.columns = 1000;
+    initializeTensor(&T2);
+    randomizeTensor(&T2);
+    //printTensor(&T2);
+    time(&startTime);
+    pBiTensor result = dotProduct(&T1, &T2); 
+    time(&endTime);
+
+    double32 totalTime = (double32) (endTime - startTime);
+    printf("Dot product execution time: %.3lf seconds\n", totalTime);
+    //printTensor(result);
     return 0;
 }

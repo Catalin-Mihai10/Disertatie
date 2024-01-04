@@ -335,6 +335,9 @@ void randomizeTensor(pBiTensor);
 void randomizeTensor(pTensor T);
 
 /* TENSOR OPERATIONS */
+double32  dotProduct(pUniTensor T1, pUniTensor T2);
+pBiTensor dotProduct(pBiTensor T1, pBiTensor T2);
+pTensor   dotProduct(pTensor T1, pTensor T2);
 
 /* HELPING FUNCTIONS */
 void printTensor(pUniTensor T);
