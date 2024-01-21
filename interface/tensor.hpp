@@ -318,9 +318,9 @@ typedef biTensor*   pBiTensor;
 typedef tensor*     pTensor;
 
 /* INITIALIZATION OPERATIONS */
-void initializeTensor(pUniTensor T);
-void initializeTensor(pBiTensor T);
-void initializeTensor(pTensor T);
+uint8 initializeTensor(pUniTensor T);
+uint8 initializeTensor(pBiTensor T);
+uint8 initializeTensor(pTensor T);
 
 void zeroTensor(pUniTensor T);
 void zeroTensor(pBiTensor T);

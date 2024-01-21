@@ -6,12 +6,12 @@
 
 /* INITIALIZATION OPERATIONS */
 
-void initializeTensor(pUniTensor T)
+uint8 initializeTensor(pUniTensor T)
 {
-    if(T->size == 0)
+    if(T->size == ZERO)
     {
         printf("ERROR: Invalid Tensor size: %u!\n", T->size);
-        exit(1);
+        return TENSOR_WRONG_SIZE;
     }
 
     T->data = (pDouble32) malloc((sizeof T->data) * T->size);
@@ -19,28 +19,38 @@ void initializeTensor(pUniTensor T)
     if(T->data == NULL)
     {
         printf("ERROR: Could not initialize tensor!\n");
-        exit(1);
+        return UNINITIALIZED_POINTER;
     }
+
+    return SUCCESS;
 }
 
-void initializeTensor(pBiTensor T)
+uint8 initializeTensor(pBiTensor T)
 {
-    if((T->rows == 0) || (T->columns == 0))
+    if((T->rows == ZERO) || (T->columns == ZERO))
     {
         printf("ERROR: Invalid Tensor size!\n");
-        exit(1);
+        return TENSOR_WRONG_SIZE;
     }
 
     T->tensor.size = T->rows * T->columns;
-    initializeTensor(&T->tensor);
+    
+    uint8 result = initializeTensor(&T->tensor);
+    if((result != SUCCESS) && (result == TENSOR_WRONG_SIZE))
+    {
+           return TENSOR_WRONG_SIZE;
+    
+    } else return UNINITIALIZED_POINTER;
+
+    return SUCCESS;
 }
 
-void initializeTensor(pTensor T)
+uint8 initializeTensor(pTensor T)
 {
-    if((T->slices == 0) || (T->rows == 0) || (T->columns == 0))
+    if((T->slices == ZERO) || (T->rows == ZERO) || (T->columns == ZERO))
     {
         printf("ERROR: Invalid Tensor size!\n");
-        exit(1);
+        return TENSOR_WRONG_SIZE;
     }
     
     T->size = T->slices * T->rows * T->columns;
@@ -50,14 +60,16 @@ void initializeTensor(pTensor T)
     if((T->offsets == NULL) || (T->data == NULL))
     {
         printf("ERROR: Could not initialize tensor!\n");
-        exit(1);
+        return UNINITIALIZED_POINTER;
     }
     
-    T->offsets[0] = 0;
-    for(uint32 slice = 1; slice < T->slices; ++slice)
+    T->offsets[0] = ZERO;
+    for(uint32 slice = ONE; slice < T->slices; ++slice)
     {
         T->offsets[slice] = T->offsets[slice - 1] + (T->rows * T->columns); 
     }
+
+    return SUCCESS;
 }
 
 
@@ -84,7 +96,7 @@ void zeroTensor(pTensor T)
 
 void onesTensor(pUniTensor T)
 {
-    for(uint32 iterator = 0; iterator < T->size; ++iterator)
+    for(uint32 iterator = ZERO; iterator < T->size; ++iterator)
     {
         T->data[iterator] = ONE;
     }
@@ -97,7 +109,7 @@ void onesTensor(pBiTensor T)
 
 void onesTensor(pTensor T)
 {
-    for(uint32 iterator = 0; iterator < T->size; ++iterator)
+    for(uint32 iterator = ZERO; iterator < T->size; ++iterator)
     {
         T->data[iterator] = ONE;
     }
@@ -107,7 +119,7 @@ void randomizeTensor(pUniTensor T)
 {
     srand((unsigned) time(NULL));
 
-    for(uint32 iterator = 0; iterator < T->size; ++iterator)
+    for(uint32 iterator = ZERO; iterator < T->size; ++iterator)
     {
         T->data[iterator] = (double32) rand() / (double32) (RAND_MAX / 1.0); 
     }
@@ -121,7 +133,7 @@ void randomizeTensor(pBiTensor T)
 void randomizeTensor(pTensor T)
 {
     srand((unsigned) time(NULL));
-    for(uint32 iterator = 0; iterator < T->size; ++iterator)
+    for(uint32 iterator = ZERO; iterator < T->size; ++iterator)
     {
         T->data[iterator] = (double32) rand() / (double32) (RAND_MAX / 1.0);
     }
@@ -130,15 +142,15 @@ void randomizeTensor(pTensor T)
 /* TENSOR OPERATIONS */
 double32 dotProduct(pUniTensor T1, pUniTensor T2)
 {
-    double32 result = 0;
+    double32 result = ZERO;
 
-    if((T1->size == 0) || (T2->size == 0) || (T1->size != T2->size))
+    if((T1->size == ZERO) || (T2->size == ZERO) || (T1->size != T2->size))
     {
         printf("ERROR: Invalid tensors size!\n");
         return result;
     }
     
-    for(uint32 iterator = 0; iterator < T1->size; ++iterator)
+    for(uint32 iterator = ZERO; iterator < T1->size; ++iterator)
     {
         result += T1->data[iterator] + T2->data[iterator];
     }
@@ -167,11 +179,11 @@ pBiTensor dotProduct(pBiTensor T1, pBiTensor T2)
     resultedTensor->columns = T2->columns;
     initializeTensor(resultedTensor);
 
-    for(uint32 row = 0; row < resultedTensor->rows; ++row)
+    for(uint32 row = ZERO; row < resultedTensor->rows; ++row)
     {
-        for(uint32 iterator = 0; iterator < T1->columns; ++iterator)
+        for(uint32 iterator = ZERO; iterator < T1->columns; ++iterator)
         {
-            for(uint32 column = 0; column < resultedTensor->columns; ++column)
+            for(uint32 column = ZERO; column < resultedTensor->columns; ++column)
             {
                 resultedTensor->tensor.data[(row * resultedTensor->columns) + column] += T1->tensor.data[(row * T1->columns) + iterator] * T2->tensor.data[(iterator * T2->columns) + column];
             }
@@ -197,7 +209,7 @@ pTensor dotProduct(pTensor T1, pTensor T2)
 void printTensor(pUniTensor T)
 {
     printf("%s = [ ", GetVarName(T));
-    for(uint32 iterator = 0; iterator < T->size; ++iterator)
+    for(uint32 iterator = ZERO; iterator < T->size; ++iterator)
     {
         printf("%*.3lf ", 5, T->data[iterator]);
     }
@@ -207,9 +219,9 @@ void printTensor(pUniTensor T)
 void printTensor(pBiTensor T)
 {
     printf("%s = [\n", GetVarName(T));
-    for(uint32 row = 0; row < T->rows; ++row)
+    for(uint32 row = ZERO; row < T->rows; ++row)
     {
-        for(uint32 column = 0; column < T->columns; ++column)
+        for(uint32 column = ZERO; column < T->columns; ++column)
         {
             printf("%*.3lf ", 11, T->tensor.data[(row * T->columns) + column]);
         }
@@ -221,12 +233,12 @@ void printTensor(pBiTensor T)
 void printTensor(pTensor T)
 {
     printf("%s= [\n", GetVarName(T));
-    for(uint32 slice = 0; slice < T->slices; ++slice)
+    for(uint32 slice = ZERO; slice < T->slices; ++slice)
     {
         printf("    [\n");
-        for(uint32 row = 0; row < T->rows; ++row)
+        for(uint32 row = ZERO; row < T->rows; ++row)
         {
-            for(uint32 column = 0; column < T->columns; ++column)
+            for(uint32 column = ZERO; column < T->columns; ++column)
             {
                 printf("%*.3lf ", 12, T->data[T->offsets[slice] + ((row * T->columns) + column)]);
             }
@@ -274,7 +286,7 @@ void testUniTensor()
     uniTensor uT = {3, NULL};
     initializeTensor(&uT);
 
-    assert(uT.size != 0);
+    assert(uT.size != ZERO);
     assert(uT.data != NULL);
 
     zeroTensor(&uT);
@@ -330,9 +342,9 @@ void testBiTensor()
    biTensor bT = {5, 3};
    initializeTensor(&bT);
 
-   assert(bT.rows != 0);
-   assert(bT.columns != 0);
-   assert(bT.tensor.size != 0);
+   assert(bT.rows != ZERO);
+   assert(bT.columns != ZERO);
+   assert(bT.tensor.size != ZERO);
    assert(bT.tensor.data != NULL);
     
    zeroTensor(&bT);
@@ -383,9 +395,9 @@ void testMultiTensor()
    tensor T = {3, 5, 3, 0, NULL, NULL};
    initializeTensor(&T);
 
-   assert(T.slices != 0);
-   assert(T.rows != 0);
-   assert(T.columns != 0);
+   assert(T.slices != ZERO);
+   assert(T.rows != ZERO);
+   assert(T.columns != ZERO);
    assert((T.offsets != NULL) && (T.data != NULL));
     
    onesTensor(&T);
@@ -430,6 +442,7 @@ void testMultiTensor()
    printf("\n--- MULTIDIMENSIONAL TENSOR CREATED ---\n");
 }
 
+/*
 int main()
 {
     //testUniTensor();
@@ -458,5 +471,6 @@ int main()
     double32 totalTime = (double32) (endTime - startTime);
     printf("Dot product execution time: %.3lf seconds\n", totalTime);
     //printTensor(result);
-    return 0;
+    return SUCCESS;
 }
+*/
