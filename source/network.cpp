@@ -1,4 +1,5 @@
 #include "../interface/network.hpp"
+#include "../utils/logger/NNLogger.hpp"
 #include <math.h>
 
 /* ALLOCATION/DEALOCATION OPERATIONS */
@@ -7,205 +8,307 @@ double32 max(double32 left, double32 right)
     return (left > right)? left:right;
 }
 
-double32 sigmoid(double dataPoint)
+double32 sigmoid(double32 dataPoint)
 {
     return ONE / (ONE + expf((-ONE) * dataPoint));
 }
 
-double32 cost(pUniTensor neurons, pUniTensor weights)
+double32 relu(double32 data)
+{
+    return max(ZERO, data);
+}
+
+double32 activation(pUniTensor inputs, pUniTensor weights)
+{
+    double32 result = ZERO;
+    
+    for(uint32 iterator = ZERO; iterator < inputs->size; ++iterator)
+    {
+        result += inputs->data[iterator] * weights->data[iterator];
+    }
+
+    return relu(result / inputs->size);
+}
+
+double32 cost(pNetwork network, pUniTensor data)
 {
     double32 result = ZERO;
 
-    for(uint32 iterator = 0; iterator < neurons->size; ++iterator)
+    for(uint32 iterator = ZERO; iterator < data->size; ++iterator)
     {
-        result += neurons->data[iterator] * weights->data[iterator];
+        for(uint32 neuron = 0; neuron < network->layers[(uint32)ZERO].size; ++neuron)
+        {
+            network->layers[(uint32)ZERO].neurons[neuron].inputs = data;
+            result += network->layers[(uint32)ZERO].activationFunction(network->layers[(uint32)ZERO].neurons[neuron].inputs, 
+                                                                       network->layers[(uint32)ZERO].neurons[neuron].weights);
+        }
+    }
+
+    for(uint32 layer = ONE; layer < network->size; ++layer)
+    {
+        for(uint32 neuron = ZERO; neuron < network->layers[layer].size; ++neuron)
+        {
+            network->layers[layer].neurons[neuron].inputs = network->layers[layer - 1].neurons[neuron].inputs;
+            result += network->layers[layer].activationFunction(network->layers[layer].neurons[neuron].inputs,
+                                                                network->layers[layer].neurons[neuron].weights); 
+        }
     }
 
     return result;
 }
 
-double32 activation(pUniTensor neurons, pUniTensor weights)
+/* CREATION FUNCTIONS */
+uint8 createNeuron(pNeuron neuron)
 {
-    return max(ZERO, cost(neurons, weights));
-}
+    neuron->inputs = (pUniTensor) malloc((sizeof *neuron->inputs));
 
-uint8 createNeuron(pNeuron neuron, uint32 inputSize)
-{
-    neuron->inputVolume = inputSize;
-    return SUCCESS;
-}
-
-uint8 createLayer(pLayer layer, uint32 layerSize, uint32 inputSize)
-{
-    layer->neurons = (pNeuron) malloc((sizeof *layer->neurons) * layerSize);
-    
-    if(layer->neurons == NULL) 
+    if(neuron->inputs == NULL)
     {
-        printf("ERROR: Could not create layer!\n");
+        NNERROR("ERROR: Could not create neuron!\n");
         return UNINITIALIZED_POINTER;
-    }   
-    
-    for(uint32 iterator = 0; iterator < layerSize; ++iterator)
+    }
+
+    neuron->weights = (pUniTensor) malloc((sizeof *neuron->weights));
+
+    if(neuron->weights == NULL)
     {
-        if(createNeuron(&layer->neurons[iterator], inputSize))
+        NNERROR("ERROR: Could not create neuron weights!\n");
+        return UNINITIALIZED_POINTER;
+    }
+
+    neuron->inputs->size    = neuron->inputSize;
+    neuron->weights->size   = neuron->inputSize;
+
+    uint8 initializeInputs  = initializeTensor(neuron->inputs),
+          initializeWeights = initializeTensor(neuron->weights);
+
+    return initializeInputs + initializeWeights;
+}
+
+uint8 createLayer(pLayer layer, uint32 inputSize)
+{
+    layer->neurons = (pNeuron) malloc((sizeof *layer->neurons) * layer->size);
+    
+    if(layer->neurons == NULL)
+    {
+        NNERROR("ERROR: Could not create layer!\n");
+        return UNINITIALIZED_POINTER;
+    }
+
+    for(uint32 iterator = ZERO; iterator < layer->size; ++iterator)
+    {
+        layer->neurons[iterator].inputSize = inputSize;
+        if(createNeuron(&layer->neurons[iterator]) != SUCCESS)
         {
-            printf("ERROR: Could not create layer!\n");
-            return UNINITIALIZED_POINTER;
+            NNERROR("ERROR: Could not create neurons layer!\n");
+            return GENERIC_ERROR_CODE;
         }
     }
 
-    layer->size = layerSize;
-   
     return SUCCESS;
 }
 
-void createNetwork(pNetwork network, uint32 size, uint32 layersSize, uint32 inputSize)
+void createNetwork(pNetwork network, uint32 size, uint32 layerSize, uint32 inputSize)
 {
+    network->size = size;
     network->layers = (pLayer) malloc((sizeof *network->layers) * size);
-
+    
     if(network->layers == NULL)
     {
-        printf("ERROR: Could not create neural network!\n");
-        return;
+        NNERROR("ERROR: Could not create network!\n");
+        freeNetwork(network);
     }
 
-    network->size = size;
-    
-    for(uint32 iterator = ZERO; iterator < network->size; ++iterator)
+    for(uint32 iterator = 0; iterator < network->size; ++iterator)
     {
-        if(createLayer(&network->layers[iterator], layersSize, inputSize) != SUCCESS)
+        network->layers[iterator].size = layerSize;
+        if(createLayer(&network->layers[iterator], inputSize) != SUCCESS)
         {
-            printf("ERROR: Could not create network layers!\n");
+            NNERROR("ERROR: Could not create network layers!\n");
             freeNetwork(network);
             return;
         }
     }
+
 }
 
 void freeNeuron(pNeuron neuron)
 {
-    free(neuron->inputs);
+    freeTensor(neuron->inputs);
     neuron->inputs = NULL;
-    free(neuron->weights);
+    freeTensor(neuron->weights);
     neuron->weights = NULL;
 
-    neuron->inputVolume = ZERO;
+    neuron->inputSize = ZERO;
 }
 
 void freeLayer(pLayer layer)
 {
-    for(uint32 iterator = ZERO; iterator < layer->size; ++iterator)
+    for(uint32 iterator = 0; iterator < layer->size; ++iterator)
     {
         freeNeuron(&layer->neurons[iterator]);
     }
     layer->neurons = NULL;
 
-    layer->size                 = ZERO;
-    layer->costFunction         = NULL;
-    layer->activationFunction   = NULL;
+    layer->activationFunction = NULL;
+    layer->size = ZERO;
 }
 
 void freeNetwork(pNetwork network)
 {
-    for(uint32 iterator = ZERO; iterator < network->size; ++iterator)
+    for(uint32 iterator = 0; iterator < network->size; ++iterator)
     {
         freeLayer(&network->layers[iterator]);
     }
-
-    free(network->layers);
     network->layers = NULL;
-
+    
     network->size = ZERO;
 }
 
-
 /* INITIALIZATION FUNCTIONS */
-uint8 initializeLayer(pLayer layer)
+void initializeNeuron(pNeuron neuron)   
 {
-    layer->activationFunction = activation;
-    layer->costFunction = cost;
- 
-    uint8 neuronsResult = initializeTensor(layer->neurons),
-          weightsResult = initializeTensor(layer->weights);
+    zeroTensor(neuron->inputs);
+    zeroTensor(neuron->weights);
+}
 
-    return neuronsResult + weightsResult;
+void initializeLayer(pLayer layer)
+{
+    for(uint32 iterator = 0; iterator < layer->size; ++iterator)
+    {
+        initializeNeuron(&layer->neurons[iterator]);
+    }
+
+    layer->activationFunction   = activation;
 }
 
 void initializeNetwork(pNetwork network)
 {
-    for(uint32 iterator = ZERO; iterator < network->size; ++iterator)
+    for(uint32 iterator = 0; iterator < network->size; ++iterator)
     {
-        if( initializeLayer(&network->layers[iterator]) != SUCCESS )
-        {
-            printf("ERROR: Could not initialize network layers!\n");
-            freeNetwork(network);
-            return;
-        }
+        initializeLayer(&network->layers[iterator]);
+        NNINFO("Layer [%d] initialized!\n", iterator);
     }
+    NNINFO("Neural Network initialized!\n");
 }
 
+/* HELPFUL FUNCTIONS */
+void printNeuronParameters(pNeuron neuron)
+{
+    printTensor(neuron->weights);
+}
+
+void printLayerParameters(pLayer layer)
+{
+    printf("[\n\n");
+    for(uint32 iterator = 0; iterator < layer->size; ++iterator)
+    {
+        printNeuronParameters(&layer->neurons[iterator]);
+    }
+    printf("\n]\n");
+}
+
+void printNetworkParameters(pNetwork network)
+{
+    printf("Printing Network parameters\n");
+    for(uint32 iterator = 0; iterator < network->size; ++iterator)
+    {
+        printf("Layer[%d]", iterator);
+        printLayerParameters(&network->layers[iterator]);
+    }
+    printf("\n");
+}
 
 /* TEST FUNCTIONS */
+void testNeuron()
+{
+    NNDEBUG("--- BUILD NEURON ---\n");
+    neuron n;
+    n.inputSize = 10;
+    createNeuron(&n);
+    assert(n.inputSize  != ZERO);
+    assert(n.inputs     != NULL);
+    assert(n.weights    != NULL);
+    NNDEBUG("--- NEURON SUCCESSFULY BUILT ---\n\n");
+
+    NNDEBUG("--- INITIALIZE NEURON ---\n");
+    initializeNeuron(&n);
+    assert(n.inputSize  != ZERO);
+    assert(n.inputs     != NULL);
+    assert(n.weights    != NULL);
+    NNDEBUG("--- NEURON SUCCESSFULY INITIALIZED ---\n\n");   
+        
+    printNeuronParameters(&n);
+
+    NNDEBUG("--- FREE NEURON ---\n");
+    freeNeuron(&n);
+    assert(n.inputSize  == ZERO);
+    assert(n.inputs     == NULL);
+    assert(n.weights    == NULL);
+    NNDEBUG("--- NEURON SUCCESSFULY FREED ---\n\n");
+}
+
 void testLayer()
 {
-    printf("--- BUILD LAYER WITH 5 NEURONS ---\n");
+    NNDEBUG("--- BUILD LAYER WITH 5 NEURONS ---\n");
     layer l;
-    createLayer(&l, 5);
+    l.size = 5;
+    uint32 inputSize = 10;
+    createLayer(&l, inputSize);
     assert(l.size != ZERO);
     assert(l.activationFunction == NULL);
     assert(l.activationFunction == NULL);
     assert(l.neurons != NULL);
-    assert(l.weights != NULL);
-    printf("--- LAYER SUCCESSFULY BUILT ---\n\n");
+    NNDEBUG("--- LAYER SUCCESSFULY BUILT ---\n\n");
 
-    printf("---  INITIALIZE LAYER ---\n");
+    NNDEBUG("---  INITIALIZE LAYER ---\n");
     initializeLayer(&l);
-    assert(l.activationFunction != NULL);
-    assert(l.costFunction != NULL);
+    //assert(l.activationFunction != NULL);
+    //assert(l.lossFunction != NULL);
     assert(l.neurons != NULL);
-    assert(l.weights != NULL);
-    printf("--- LAYER INITIALIZED ---\n\n");
+    NNDEBUG("--- LAYER INITIALIZED ---\n\n");
     
-    printf("--- FREE LAYER ---\n");
+    printLayerParameters(&l);
+
+    NNDEBUG("--- FREE LAYER ---\n");
     freeLayer(&l);
     assert(l.size == ZERO);
-    assert(l.weights == NULL);
     assert(l.neurons == NULL);
-    assert(l.costFunction == NULL);
     assert(l.activationFunction == NULL);
-    printf("--- LAYER FREED ---\n\n");
+    NNDEBUG("--- LAYER FREED ---\n\n");
 }
 
 void testNetwork()
 {
-    printf("--- CREATE NEURAL NETWORK ---\n");
+    NNDEBUG("--- CREATE NEURAL NETWORK ---\n");
     network n;
-    createNetwork(&n, 3, 3);
-    printf("returned!\n");
+    createNetwork(&n, 3, 5, 10);
     assert(n.size != ZERO);
     assert(n.layers != NULL);
-    printf("--- NEURAL NETWORK CREATED ---\n\n");
+    NNDEBUG("--- NEURAL NETWORK CREATED ---\n\n");
 
-    printf("--- INITIALIZE NEURAL NETWORK ---\n");
+    NNDEBUG("--- INITIALIZE NEURAL NETWORK ---\n");
     initializeNetwork(&n);
-    assert(n.layers->size != ZERO);
-    assert(n.layers->activationFunction != NULL);
-    assert(n.layers->costFunction != NULL);
-    assert(n.layers->neurons != NULL);
-    assert(n.layers->weights != NULL);
-    printf("--- NETWORK INITIALIZED ---\n\n");
+    assert(n.layers != NULL);
+    assert(n.size != ZERO);
+    //assert(n.layers->activationFunction != NULL);
+    //assert(n.layers->costFunction != NULL);
+    //assert(n.layers->neurons != NULL);
+    //assert(n.layers->weights != NULL);
+    NNDEBUG("--- NETWORK INITIALIZED ---\n\n");
 
-    double32 learningRate = 0.001;
+    printNetworkParameters(&n);
 
-    printf("--- FREE NEURAL NETWORK ---\n");
+    NNDEBUG("--- FREE NEURAL NETWORK ---\n");
     freeNetwork(&n);
     assert(n.size == ZERO);
     assert(n.layers == NULL);
-    printf("--- NEURAL NETWORK FREED ---\n\n");
+    NNDEBUG("--- NEURAL NETWORK FREED ---\n\n");
 }
 
 int main()
 {
+    testNeuron();
     testLayer();
     testNetwork();
     return 0;

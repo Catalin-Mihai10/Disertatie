@@ -1,4 +1,5 @@
 #include "../interface/tensor.hpp"
+#include "../utils/logger/NNLogger.hpp"
 #include <cstdlib>
 
 /* DEFINE MACROS */
@@ -10,7 +11,7 @@ uint8 initializeTensor(pUniTensor T)
 {
     if(T->size == ZERO)
     {
-        printf("ERROR: Invalid Tensor size: %u!\n", T->size);
+        NNERROR("ERROR: Invalid Tensor size: %u!\n", T->size);
         return TENSOR_WRONG_SIZE;
     }
 
@@ -18,7 +19,7 @@ uint8 initializeTensor(pUniTensor T)
     
     if(T->data == NULL)
     {
-        printf("ERROR: Could not initialize tensor!\n");
+        NNERROR("ERROR: Could not initialize tensor!\n");
         return UNINITIALIZED_POINTER;
     }
 
@@ -29,7 +30,7 @@ uint8 initializeTensor(pBiTensor T)
 {
     if((T->rows == ZERO) || (T->columns == ZERO))
     {
-        printf("ERROR: Invalid Tensor size!\n");
+        NNERROR("ERROR: Invalid Tensor size!\n");
         return TENSOR_WRONG_SIZE;
     }
 
@@ -49,7 +50,7 @@ uint8 initializeTensor(pTensor T)
 {
     if((T->slices == ZERO) || (T->rows == ZERO) || (T->columns == ZERO))
     {
-        printf("ERROR: Invalid Tensor size!\n");
+        NNERROR("ERROR: Invalid Tensor size!\n");
         return TENSOR_WRONG_SIZE;
     }
     
@@ -59,7 +60,7 @@ uint8 initializeTensor(pTensor T)
 
     if((T->offsets == NULL) || (T->data == NULL))
     {
-        printf("ERROR: Could not initialize tensor!\n");
+        NNERROR("ERROR: Could not initialize tensor!\n");
         return UNINITIALIZED_POINTER;
     }
     
@@ -146,7 +147,7 @@ double32 dotProduct(pUniTensor T1, pUniTensor T2)
 
     if((T1->size == ZERO) || (T2->size == ZERO) || (T1->size != T2->size))
     {
-        printf("ERROR: Invalid tensors size!\n");
+        NNERROR("ERROR: Invalid tensors size!\n");
         return result;
     }
     
@@ -160,18 +161,18 @@ double32 dotProduct(pUniTensor T1, pUniTensor T2)
 
 pBiTensor dotProduct(pBiTensor T1, pBiTensor T2)
 {
-    pBiTensor resultedTensor;
+    pBiTensor resultedTensor = NULL;
 
     if(T1->columns != T2->rows)
     {
-        printf("ERROR: Invalid tensors size!\n");
+        NNERROR("ERROR: Invalid tensors size!\n");
         return resultedTensor;
     }
     
     resultedTensor = (pBiTensor) malloc((sizeof *resultedTensor));
     if(resultedTensor == NULL)
     {
-        printf("ERROR: Could not create new tensor!\n");
+        NNERROR("ERROR: Could not create new tensor!\n");
         return resultedTensor;
     }
 
@@ -208,7 +209,7 @@ pTensor dotProduct(pTensor T1, pTensor T2)
 /* HELPING FUNCTIONS */
 void printTensor(pUniTensor T)
 {
-    printf("%s = [ ", GetVarName(T));
+    printf("[ "); 
     for(uint32 iterator = ZERO; iterator < T->size; ++iterator)
     {
         printf("%*.3lf ", 5, T->data[iterator]);

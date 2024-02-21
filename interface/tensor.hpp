@@ -18,7 +18,7 @@ typedef struct uniTensor
 {
     uint32      size;
     pDouble32   data;
-
+    
     uniTensor operator=(const uniTensor& T)
     {
         this->size = T.size;
@@ -129,7 +129,7 @@ typedef struct biTensor
     uint32      rows,
                 columns;
     uniTensor   tensor;
-
+    
     biTensor operator=(const biTensor& T)
     {
         this->rows =    T.rows;
@@ -213,7 +213,7 @@ typedef struct tensor
             size;
     pUInt32 offsets;
     pDouble32 data;
-
+    
     tensor operator=(const tensor& T)
     {
         this->slices =  T.slices;

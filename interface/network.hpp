@@ -4,6 +4,16 @@
 #include "types.hpp"
 #include "tensor.hpp"
 
+typedef struct neuron
+{
+    uint32 inputSize;
+
+    pUniTensor  inputs,
+                weights;
+} neuron;
+
+typedef neuron* pNeuron;
+
 /**
  * @brief structure that represents a layer of a
  * neural network. The network is a fully conected FFN.
@@ -29,12 +39,10 @@
 typedef struct layer
 {
     uint32 size;
-    
-    pUniTensor  neurons,
-                weights;
-    
-    double32 (*activationFunction)  (pUniTensor neurons, pUniTensor weights);
-    double32 (*lossFunction)        (pUniTensor neurons, pUniTensor weights);
+   
+    pNeuron neurons;
+   
+    double32 (*activationFunction)  (pUniTensor inputs, pUniTensor weights);
 } layer;
 
 typedef layer* pLayer;
@@ -54,6 +62,25 @@ typedef struct network
     pLayer layers;
 } network;
 
+typedef network* pNetwork;
 
+/* CREATE FUNCTIONS */
+uint8 createNeuron(pNeuron neuron);
+uint8 createLayer(pLayer layer, uint32 inputSize);
+void  createNetwork(pNetwork network, uint32 size, uint32 layerSize, uint32 inputSize);
+
+void freeNeuron(pNeuron neuron);
+void freeLayer(pLayer layer);
+void freeNetwork(pNetwork network);
+
+/* INITIALIZATION FUNCTIONS */
+void initializeNeuron(pNeuron neuron);
+void initializeLayer(pLayer layer);
+void initializeNetwork(pNetwork network);
+
+/* HELPFUL FUNCTIONS */
+void printNetworkParameters(pNetwork network);
+void printLayerParameters(pLayer layer);
+void printNeuronParameters(pNeuron neuron);
 
 #endif /* NEURAL_NETWORK_HEADER */
