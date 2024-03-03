@@ -34,13 +34,14 @@ double32 cost(pNetwork network, pUniTensor data)
 {
     double32 result = ZERO;
 
-    for(uint32 iterator = ZERO; iterator < data->size; ++iterator)
+    for(uint32 neuron = 0; neuron < network->layers[(uint32)ZERO].size; ++neuron)
     {
-        for(uint32 neuron = 0; neuron < network->layers[(uint32)ZERO].size; ++neuron)
+        network->layers[(uint32)ZERO].neurons[neuron].inputs = data;
+        for(uint32 index = ZERO; index < network->layers[(uint32)ZERO].size; ++index)
         {
-            network->layers[(uint32)ZERO].neurons[neuron].inputs = data;
-            result += network->layers[(uint32)ZERO].activationFunction(network->layers[(uint32)ZERO].neurons[neuron].inputs, 
-                                                                       network->layers[(uint32)ZERO].neurons[neuron].weights);
+            network->layers[(uint32)ZERO].activations[index] = network->layers[(uint32)ZERO].activationFunction(network->layers[(uint32)ZERO].neurons[neuron].inputs, 
+                                                                                                                network->layers[(uint32)ZERO].neurons[neuron].weights);
+            result += network->layers[(uint32)ZERO].activations[index];
         }
     }
 
@@ -48,9 +49,18 @@ double32 cost(pNetwork network, pUniTensor data)
     {
         for(uint32 neuron = ZERO; neuron < network->layers[layer].size; ++neuron)
         {
-            network->layers[layer].neurons[neuron].inputs = network->layers[layer - 1].neurons[neuron].inputs;
-            result += network->layers[layer].activationFunction(network->layers[layer].neurons[neuron].inputs,
-                                                                network->layers[layer].neurons[neuron].weights); 
+            network->layers[layer].neurons[neuron].inputs->data = network->layers[layer].activations;
+            for(uint32 index = ZERO; index < network->layers[(uint32)ZERO].size; ++index)
+            {
+                network->layers[(uint32)ZERO].activations[index] = network->layers[layer].activationFunction(network->layers[layer].neurons[neuron].inputs,
+                                                                                                             network->layers[layer].neurons[neuron].weights); 
+                result += network->layers[(uint32)ZERO].activations[index];
+            }
+        
+            for(uint32 weight = 0; weight < network->layers[(uint32)ZERO].neurons[(uint32(ZERO))].inputSize; ++weight)
+            {
+                network->layers[layer].neurons[neuron].weights[weight] += 2 * (1  / network->layers[(uint32(ZERO))].size) * result * max(1, network->layers[layer-1].activations[neuron]); 
+            }
         }
     }
 
@@ -75,7 +85,8 @@ uint8 createNeuron(pNeuron neuron)
         NNERROR("ERROR: Could not create neuron weights!\n");
         return UNINITIALIZED_POINTER;
     }
-
+    
+    neuron->activation      = ZERO;
     neuron->inputs->size    = neuron->inputSize;
     neuron->weights->size   = neuron->inputSize;
 
@@ -139,7 +150,8 @@ void freeNeuron(pNeuron neuron)
     freeTensor(neuron->weights);
     neuron->weights = NULL;
 
-    neuron->inputSize = ZERO;
+    neuron->activation = ZERO;
+    neuron->inputSize  = ZERO;
 }
 
 void freeLayer(pLayer layer)

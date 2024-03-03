@@ -1,15 +1,14 @@
 #ifndef NEURAL_NETWORK_HEADER
 #define NEURAL_NETWORK_HEADER
 
-#include "types.hpp"
-#include "tensor.hpp"
+#include "constants.h"
+#include "tensor.h"
 
 typedef struct neuron
 {
-    uint32 inputSize;
-
-    pUniTensor  inputs,
-                weights;
+    uint32  inputSize;
+    pTensor inputs,
+            weights;
 } neuron;
 
 typedef neuron* pNeuron;
@@ -39,11 +38,10 @@ typedef neuron* pNeuron;
 typedef struct layer
 {
     uint32 size;
-   
+    double32 (*activationFunction)  (pTensor inputs, pTensor weights);
+    pDouble32 activations;
     pNeuron neurons;
-   
-    double32 (*activationFunction)  (pUniTensor inputs, pUniTensor weights);
-} layer;
+}layer;
 
 typedef layer* pLayer;
 

@@ -1,7 +1,6 @@
 #ifndef TYPES_HEADER
 #define TYPES_HEADER
 
-#include <cstdint>
 #include <stdint.h>
 
 /* INTEGERS DEFINES */

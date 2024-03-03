@@ -1,7 +1,7 @@
 #ifndef NNLOGGER_HEADER
 #define NNLOGGER_HEADER
 
-#include "../../interface/types.hpp"
+#include "../../interface/types.h"
 
 typedef enum logLevels
 {
@@ -35,12 +35,12 @@ static const schar8 *colors[] =
     "\033[0m"   // CLEAR   - 8
 };
 
-void log(logLevels level, const pSChar8 file, sint32 line, const pSChar8 message, ...); 
+void NNlog(logLevels level, const pSChar8 file, sint32 line, const pSChar8 message, ...); 
 
-#define NNFATAL(message, ...) log(NNLOG_FATAL, __FILE__, __LINE__, message, ##__VA_ARGS__)
-#define NNERROR(message, ...) log(NNLOG_ERROR, __FILE__, __LINE__, message, ##__VA_ARGS__)
-#define NNDEBUG(message, ...) log(NNLOG_DEBUG, __FILE__, __LINE__, message, ##__VA_ARGS__)
-#define NNWARN(message, ...)  log(NNLOG_WARN, __FILE__, __LINE__, message, ##__VA_ARGS__)
-#define NNINFO(message, ...)  log(NNLOG_INFO, __FILE__, __LINE__, message, ##__VA_ARGS__)
+#define NNFATAL(message, ...) NNlog(NNLOG_FATAL, __FILE__, __LINE__, message, ##__VA_ARGS__)
+#define NNERROR(message, ...) NNlog(NNLOG_ERROR, __FILE__, __LINE__, message, ##__VA_ARGS__)
+#define NNDEBUG(message, ...) NNlog(NNLOG_DEBUG, __FILE__, __LINE__, message, ##__VA_ARGS__)
+#define NNWARN(message, ...)  NNlog(NNLOG_WARN, __FILE__, __LINE__, message, ##__VA_ARGS__)
+#define NNINFO(message, ...)  NNlog(NNLOG_INFO, __FILE__, __LINE__, message, ##__VA_ARGS__)
 
 #endif /* NNLOGER_HEADER */

@@ -1,0 +1,76 @@
+2024-2-27_17:40:12 [DEBUG] source/network.cpp[239]: --- BUILD NEURON ---
+
+2024-2-27_17:40:12 [DEBUG] source/network.cpp[246]: --- NEURON SUCCESSFULY BUILT ---
+
+
+2024-2-27_17:40:12 [DEBUG] source/network.cpp[248]: --- INITIALIZE NEURON ---
+
+2024-2-27_17:40:12 [DEBUG] source/network.cpp[253]: --- NEURON SUCCESSFULY INITIALIZED ---
+
+
+2024-2-27_17:40:12 [DEBUG] source/network.cpp[257]: --- FREE NEURON ---
+
+2024-2-27_17:40:12 [DEBUG] source/network.cpp[262]: --- NEURON SUCCESSFULY FREED ---
+
+
+2024-2-27_17:40:12 [DEBUG] source/network.cpp[267]: --- BUILD LAYER WITH 5 NEURONS ---
+
+2024-2-27_17:40:12 [DEBUG] source/network.cpp[276]: --- LAYER SUCCESSFULY BUILT ---
+
+
+2024-2-27_17:40:12 [DEBUG] source/network.cpp[278]: ---  INITIALIZE LAYER ---
+
+2024-2-27_17:40:12 [DEBUG] source/network.cpp[283]: --- LAYER INITIALIZED ---
+
+
+2024-2-27_17:40:12 [DEBUG] source/network.cpp[287]: --- FREE LAYER ---
+
+2024-2-27_17:40:12 [DEBUG] source/network.cpp[292]: --- LAYER FREED ---
+
+
+2024-2-27_17:40:12 [DEBUG] source/network.cpp[297]: --- CREATE NEURAL NETWORK ---
+
+2024-2-27_17:40:12 [DEBUG] source/network.cpp[302]: --- NEURAL NETWORK CREATED ---
+
+
+2024-2-27_17:40:12 [DEBUG] source/network.cpp[304]: --- INITIALIZE NEURAL NETWORK ---
+
+2024-2-27_17:40:12 [INFO] source/network.cpp[204]: Layer [0] initialized!
+
+2024-2-27_17:40:12 [INFO] source/network.cpp[204]: Layer [1] initialized!
+
+2024-2-27_17:40:12 [INFO] source/network.cpp[204]: Layer [2] initialized!
+
+2024-2-27_17:40:12 [INFO] source/network.cpp[206]: Neural Network initialized!
+
+2024-2-27_17:40:12 [DEBUG] source/network.cpp[312]: --- NETWORK INITIALIZED ---
+
+
+2024-2-27_17:40:12 [DEBUG] source/network.cpp[316]: --- FREE NEURAL NETWORK ---
+
+2024-2-27_17:40:12 [DEBUG] source/network.cpp[320]: --- NEURAL NETWORK FREED ---
+
+
+2024-2-27_17:52:28 [DEBUG] source/network.cpp[328]: Construct neural network
+2024-2-27_17:53:2 [DEBUG] source/network.cpp[328]: Construct neural network
+2024-2-27_17:53:49 [DEBUG] source/network.cpp[328]: Construct neural network
+2024-2-27_17:53:49 [INFO] source/network.cpp[204]: Layer [0] initialized!
+
+2024-2-27_17:53:49 [INFO] source/network.cpp[204]: Layer [1] initialized!
+
+2024-2-27_17:53:49 [INFO] source/network.cpp[204]: Layer [2] initialized!
+
+2024-2-27_17:53:49 [INFO] source/network.cpp[206]: Neural Network initialized!
+
+2024-2-27_17:53:49 [DEBUG] source/network.cpp[333]: Create test data
+2024-2-27_17:57:11 [DEBUG] source/network.cpp[328]: Construct neural network
+2024-2-27_17:57:11 [INFO] source/network.cpp[204]: Layer [0] initialized!
+
+2024-2-27_17:57:11 [INFO] source/network.cpp[204]: Layer [1] initialized!
+
+2024-2-27_17:57:11 [INFO] source/network.cpp[204]: Layer [2] initialized!
+
+2024-2-27_17:57:11 [INFO] source/network.cpp[206]: Neural Network initialized!
+
+2024-2-27_17:57:11 [DEBUG] source/network.cpp[333]: Create test data
+2024-2-27_17:57:11 [DEBUG] source/network.cpp[339]: Compute network cost

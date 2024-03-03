@@ -12,7 +12,7 @@ uint32 getFileSize(const pSChar8 source)
     return status.st_size;
 }
 
-void parseSource(const pSChar8 source, const pSChar8 destination)
+uint32 readData(const pSChar8 source, pSChar8 data)
 {
     uint32 sourceSize = getFileSize(source);
     uint32 descriptor = open(source, O_RDONLY);
@@ -23,7 +23,7 @@ void parseSource(const pSChar8 source, const pSChar8 destination)
         exit(1);
     }
     
-    pSChar8 data = (pSChar8) malloc((sizeof *data) * sourceSize);
+    data = (pSChar8) malloc((sizeof *data) * sourceSize);
 
     if(!data)
     {
@@ -39,7 +39,12 @@ void parseSource(const pSChar8 source, const pSChar8 destination)
         printf("ERROR: Could not read source data!\n");
         exit(1);
     }
+    
+    return readResult;
+}
 
+void writeData(pSChar8 destination, pSChar8 data, uint32 size)
+{
     uint32 desDescriptor = open(destination, O_CREAT | O_WRONLY);
 
     if(desDescriptor < 0)
@@ -48,7 +53,7 @@ void parseSource(const pSChar8 source, const pSChar8 destination)
         exit(1);
     }
 
-    uint32 writeResult = write(desDescriptor, data, readResult);
+    uint32 writeResult = write(desDescriptor, data, size);
     
     close(desDescriptor);
 
@@ -56,6 +61,16 @@ void parseSource(const pSChar8 source, const pSChar8 destination)
     {
         printf("ERROR: Could not write data into file!\n");
     }
+}
+
+void parseSource(const pSChar8 source, const pSChar8 destination)
+{
+    pSChar8 data;
+    uint32 readBytes = readData(source, data);
+
+    // TODO: Parse the data and tokenize.
+
+    writeData(destination, data, readBytes);
 }
 
 int main()

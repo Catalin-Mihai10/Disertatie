@@ -1,7 +1,6 @@
-#include "../../interface/basicLibraries.hpp"
+#include "../../interface/basic/libraries.h"
 
-#include "NNLogger.hpp"
-#include <cstdio>
+#include "NNLogger.h"
 #include <fcntl.h>
 #include <stdarg.h>
 #include <sys/stat.h>
@@ -61,7 +60,7 @@ void writeToFile(logLevels level, const pSChar8 fileSource, sint32 line, const p
     }
 }
 
-void log(logLevels level, const pSChar8 file, sint32 line, const pSChar8 message, ...)
+void NNlog(logLevels level, const pSChar8 file, sint32 line, const pSChar8 message, ...)
 {
     schar8 formatedMessage[MAX_LOG_LENGTH_SIZE];
     

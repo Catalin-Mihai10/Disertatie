@@ -1,3 +1,3 @@
-!#/bin/bash
+#!/bin/bash
 
-clang -o3 -Wall -Wextra -pedantic -Wno-unused-parameter -o network "source/network.cpp" "source/tensor.cpp" "utils/logger/NNLogger.cpp" -lm
+clang -o3 -Wall -Wextra -pedantic -Wno-uninitialized -Wno-unused-parameter -Wno-deprecated-copy-with-user-provided-copy -Wno-gnu-zero-variadic-macro-arguments -Wno-writable-strings -Wno-missing-field-initializers -o network "source/network.c" "source/tensor.c" "utils/logger/NNLogger.c" -lm

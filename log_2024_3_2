@@ -1,0 +1,12 @@
+2024-3-2_14:43:24 [DEBUG] source/network.c[327]: Construct neural network
+2024-3-2_14:43:24 [INFO] source/network.c[203]: Layer [0] initialized!
+
+2024-3-2_14:43:24 [INFO] source/network.c[203]: Layer [1] initialized!
+
+2024-3-2_14:43:24 [INFO] source/network.c[203]: Layer [2] initialized!
+
+2024-3-2_14:43:25 [INFO] source/network.c[205]: Neural Network initialized!
+
+2024-3-2_14:43:25 [DEBUG] source/network.c[332]: Create test data
+2024-3-2_14:43:25 [DEBUG] source/network.c[338]: Compute network cost
+2024-3-2_14:44:4 [INFO] source/network.c[340]: Network cost: 25.025129
