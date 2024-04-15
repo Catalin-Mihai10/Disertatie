@@ -3,6 +3,8 @@
 
 #include "../../interface/types.h"
 
+#define ENABLE_DEBUG_LOG 0
+
 typedef enum logLevels
 {
     NNLOG_FATAL = 0,
@@ -39,7 +41,13 @@ void NNlog(logLevels level, const pSChar8 file, sint32 line, const pSChar8 messa
 
 #define NNFATAL(message, ...) NNlog(NNLOG_FATAL, __FILE__, __LINE__, message, ##__VA_ARGS__)
 #define NNERROR(message, ...) NNlog(NNLOG_ERROR, __FILE__, __LINE__, message, ##__VA_ARGS__)
+
+#if ENABLE_DEBUG_LOG == 1
 #define NNDEBUG(message, ...) NNlog(NNLOG_DEBUG, __FILE__, __LINE__, message, ##__VA_ARGS__)
+#else
+#define NNDEBUG(message, ...) 
+#endif
+
 #define NNWARN(message, ...)  NNlog(NNLOG_WARN, __FILE__, __LINE__, message, ##__VA_ARGS__)
 #define NNINFO(message, ...)  NNlog(NNLOG_INFO, __FILE__, __LINE__, message, ##__VA_ARGS__)
 

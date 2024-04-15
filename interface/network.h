@@ -7,6 +7,7 @@
 typedef struct neuron
 {
     uint32  inputSize;
+    double32 bias;
     pTensor inputs,
             weights;
 } neuron;
@@ -38,8 +39,9 @@ typedef neuron* pNeuron;
 typedef struct layer
 {
     uint32 size;
-    double32 (*activationFunction)  (pTensor inputs, pTensor weights);
-    pDouble32 activations;
+    //double32 (*activationFunction)  (pTensor inputs, pTensor weights);
+    pTensor activations,
+            gradients;
     pNeuron neurons;
 }layer;
 
@@ -62,10 +64,18 @@ typedef struct network
 
 typedef network* pNetwork;
 
+typedef enum activations 
+{
+    RELU = 0x00,
+    LRELU,
+    PRELU,
+    SOFTMAX
+} activations;
+
 /* CREATE FUNCTIONS */
 uint8 createNeuron(pNeuron neuron);
 uint8 createLayer(pLayer layer, uint32 inputSize);
-void  createNetwork(pNetwork network, uint32 size, uint32 layerSize, uint32 inputSize);
+void  createNetwork(pNetwork network, uint32 size, pUInt32 layerSize, pUInt32 inputSizePerLayer);
 
 void freeNeuron(pNeuron neuron);
 void freeLayer(pLayer layer);
@@ -76,9 +86,11 @@ void initializeNeuron(pNeuron neuron);
 void initializeLayer(pLayer layer);
 void initializeNetwork(pNetwork network);
 
+/*  */
+void setLayerActivationFunction(uint8 type);
+
 /* HELPFUL FUNCTIONS */
 void printNetworkParameters(pNetwork network);
 void printLayerParameters(pLayer layer);
 void printNeuronParameters(pNeuron neuron);
-
 #endif /* NEURAL_NETWORK_HEADER */

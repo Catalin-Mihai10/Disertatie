@@ -1,6 +1,7 @@
 #include "../interface/tensor.h"
 #include "../utils/logger/NNLogger.h"
 #include <string.h>
+#include <math.h>
 
 /* DEFINE MACROS */
 #define GetVarName(var) #var
@@ -51,11 +52,34 @@ void randomizeTensor(pTensor T)
 
     for(uint32 iterator = ZERO; iterator < T->size; ++iterator)
     {
-        T->data[iterator] = (double32) rand() / (double32) (RAND_MAX / 1.0); 
+        T->data[iterator] = ((double32) rand() / (double32) (RAND_MAX)) * 2 - 1; 
+    }
+}
+
+void heUniformInitialization(pTensor T)
+{
+    srand((unsigned) time(NULL));
+
+    double32 positiveThreshold = sqrt(6.0/T->size),
+             negativeThreshold = -sqrt(6.0/T->size);
+    for(uint32 iterator = (uint32)ZERO; iterator < T->size; ++iterator)
+    {
+        T->data[iterator] = ((double32) rand() / (double32) (RAND_MAX)) * fabs(negativeThreshold - positiveThreshold) + negativeThreshold; 
     }
 }
 
 /* TENSOR OPERATIONS */
+void copyTensorData(pTensor T1, pTensor T2)
+{
+    if(T1->size != T2->size)
+    {
+        NNERROR("Tensors of different size, %d -- %d!", T1->size, T2->size);
+        return;
+    }
+ 
+    memcpy(T1->data, T2->data, (sizeof *T2->data) * T2->size);
+}
+
 void copyTensor(pTensor T1, pTensor T2)
 {
     if((T1->size != (uint32)ZERO) && (T1->size != T2->size))
@@ -168,6 +192,86 @@ void multiplyTensor(pTensor T1, pTensor T2)
     }
 }
 
+void squareTensor(pTensor T)
+{
+    if(T->size == 0)
+    {
+        NNERROR("Tensor empty!");
+        return;
+    }
+
+    for(uint32 iterator = (uint32)ZERO; ++iterator < T->size; ++iterator)
+    {
+        T->data[iterator] *= T->data[iterator];
+    }
+}
+
+pTensor substractTensors(pTensor T1, pTensor T2)
+{
+
+    pTensor result = NULL;
+    if((T1->size == ZERO) || (T2->size == ZERO) || (T1->size != T2->size))
+    {
+        NNERROR("Tensors are of different size: %d - %d!", T1->size, T2->size);
+        return result;
+    }
+
+    result = malloc((sizeof *result));
+
+    if(result == NULL)
+    {
+        NNERROR("Could not create new tensor!");
+        return result;
+    }
+
+    result->size = T1->size;
+    initializeTensor(result);
+    zeroTensor(result);
+
+    for(uint32 iterator = (uint32)ZERO; iterator < T1->size; ++iterator)
+    {
+        result->data[iterator] = T1->data[iterator] - T2->data[iterator];
+    }
+    
+    return result;
+}
+
+double32 sumTensor(pTensor T)
+{
+    double32 result = ZERO;
+
+    if(T->size == ZERO)
+    {
+        NNERROR("ERROR: Invalid tensor size!\n");
+        return result;
+    }
+
+    for(uint32 iterator = (uint32)ZERO; iterator < T->size; ++iterator)
+    {
+        result += T->data[iterator];
+    }
+
+    return result;
+}
+
+double32 sumTensors(pTensor T1, pTensor T2)
+{
+    double32 result = ZERO;
+
+    if((T1->size == ZERO) || (T2->size == ZERO) || (T1->size != T2->size))
+    {
+        NNERROR("ERROR: Invalid tensors size!\n");
+        return result;
+    }
+    
+    for(uint32 iterator = (uint32)ZERO; iterator < T1->size; ++iterator)
+    {
+        result += T1->data[iterator] + T2->data[iterator];
+    }
+
+    return result;
+}
+
 double32 dotProduct(pTensor T1, pTensor T2)
 {
     double32 result = ZERO;
@@ -180,7 +284,7 @@ double32 dotProduct(pTensor T1, pTensor T2)
     
     for(uint32 iterator = ZERO; iterator < T1->size; ++iterator)
     {
-        result += T1->data[iterator] + T2->data[iterator];
+        result += T1->data[iterator] * T2->data[iterator];
     }
 
     return result;
@@ -192,7 +296,7 @@ void printTensor(pTensor T)
     printf("[ "); 
     for(uint32 iterator = ZERO; iterator < T->size; ++iterator)
     {
-        printf("%*.3lf ", 5, T->data[iterator]);
+        printf("%*.6lf ", 5, T->data[iterator]);
     }
     printf("]\n");
 }
@@ -204,6 +308,8 @@ void freeTensor(pTensor T)
 
     free(T->data);
     T->data = NULL;
+    free(T);
+    T = NULL;
 }
 
 /* TEST FUNCTIONS */
@@ -212,7 +318,6 @@ void testTensor(void)
     printf("--- CREATE UNIDIMENSIONAL TENSOR ---\n\n");
     tensor uT = {3, NULL};
     initializeTensor(&uT);
-
     assert(uT.size != ZERO);
     assert(uT.data != NULL);
 

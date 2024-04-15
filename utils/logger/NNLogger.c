@@ -8,7 +8,7 @@
 #include <unistd.h>
 
 #define MAX_LOG_FILE_NAME 255
-#define MAX_LOG_LENGTH_SIZE 16384
+#define MAX_LOG_LENGTH_SIZE 2048 
 
 uint8 fileExists(const pSChar8 file)
 {
@@ -100,6 +100,7 @@ void NNlog(logLevels level, const pSChar8 file, sint32 line, const pSChar8 messa
     }
 
     printf("%s", logOutput);
+    fflush(stdout);
     writeToFile(level, file, line, formatedMessage, logTimeInfo);
 }
 

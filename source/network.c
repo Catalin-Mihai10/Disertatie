@@ -1,13 +1,11 @@
 #include "../interface/network.h"
 #include "../utils/logger/NNLogger.h"
+#include "../utils/parser/parser.h"
+
 #include "math.h"
+#include <unistd.h>
 
 /* ALLOCATION/DEALOCATION OPERATIONS */
-double32 max(double32 left, double32 right)
-{
-    return (left > right)? left:right;
-}
-
 double32 sigmoid(double32 dataPoint)
 {
     return ONE / (ONE + expf((-ONE) * dataPoint));
@@ -15,56 +13,236 @@ double32 sigmoid(double32 dataPoint)
 
 double32 relu(double32 data)
 {
-    return max(ZERO, data);
+    return (data > 0.0)? data:ZERO;
 }
 
-double32 activation(pTensor inputs, pTensor weights)
+double32 leakyRelu(double32 data)
 {
-    double32 result = ZERO;
-    
-    for(uint32 iterator = ZERO; iterator < inputs->size; ++iterator)
+    double32 param = 0.01;
+    return (data > 0.0)? data:param * data;
+}
+
+double32 leakyReluDerivative(double32 data)
+{
+    double param = 0.01;
+    return (data > 0.0)? ONE:param;
+}
+
+double32 reluDerivative(double32 activation)
+{
+    return (activation > 0.0)? ONE:ZERO;
+}
+
+void softmax(pTensor activations) 
+{
+    double32 maximum = -9999.9999,
+             sum = ZERO,
+             scaling = ZERO;
+
+    for(uint32 iterator = (uint32)ZERO; iterator < activations->size; ++iterator)
     {
-        result += inputs->data[iterator] * weights->data[iterator];
+        if(maximum < activations->data[iterator]) maximum = activations->data[iterator];
+    }
+    
+    for(uint32 iterator = (uint32)ZERO; iterator < activations->size; ++iterator)
+    {
+        sum += expf(activations->data[iterator] - maximum);
     }
 
-    return relu(result / inputs->size);
+    scaling = maximum + log(sum);
+    for(uint32 iterator = (uint32)ZERO; iterator < activations->size; ++iterator)
+    {
+        activations->data[iterator] = expf(activations->data[iterator] - scaling);
+        assert(!isnan(activations->data[iterator]));   
+    }
 }
 
-//TODO: Add also the ground truth piece. And check to see if we need bias
-double32 cost(pNetwork network, pTensor data)
+double32 neuronCost(pNeuron neuron)
 {
-    double32 result = ZERO;
+    double32 result = dotProduct(neuron->inputs, neuron->weights);
+    return result + neuron->bias;
+}
 
-    for(uint32 neuron = (uint32)ZERO; neuron < network->layers[(uint32)ZERO].size; ++neuron)
+double32 activationDerivative(double32 value, activations activation)
+{
+    double32 derivative = ZERO;
+    switch(activation)
     {
-        network->layers[(uint32)ZERO].neurons[neuron].inputs = data;
-        for(uint32 index = ZERO; index < network->layers[(uint32)ZERO].size; ++index)
+        case RELU:
         {
-            network->layers[(uint32)ZERO].activations[index] = network->layers[(uint32)ZERO].activationFunction(network->layers[(uint32)ZERO].neurons[neuron].inputs, 
-                                                                                                                network->layers[(uint32)ZERO].neurons[neuron].weights);
-            result += network->layers[(uint32)ZERO].activations[index];
+            derivative = reluDerivative(value);
+        } break;
+        case LRELU:
+        case PRELU:
+        {
+            derivative = leakyReluDerivative(value);
+        } break;
+        default: break;
+    }
+
+    return derivative;
+}
+
+void activation(pTensor values, activations activation)
+{
+    switch(activation)
+    {
+        case RELU:
+        {
+            for(uint32 iterator = (uint32)ZERO; iterator < values->size; ++iterator)
+            {
+                values->data[iterator] = relu(values->data[iterator]);
+                assert(!isnan(values->data[iterator]));
+            }
+        } break;
+        case LRELU:
+        case PRELU:
+        {
+            for(uint32 iterator = (uint32)ZERO; iterator < values->size; ++iterator)
+            {
+                values->data[iterator] = leakyRelu(values->data[iterator]);
+                assert(!isnan(values->data[iterator]));
+            }
+        } break;
+        case SOFTMAX:
+        {
+            softmax(values);
+        } break;
+        default: break;
+    }
+}
+
+void clipGradient(pTensor gradient)
+{
+    double norm = ZERO;
+    for(uint32 iterator = (uint32)ZERO; iterator < gradient->size; ++iterator)
+    {
+        norm += gradient->data[iterator] * gradient->data[iterator];
+    }
+    norm = sqrt(norm);
+
+    if(norm > ONE)
+    {
+        double32 scale = ONE / norm;
+        for(uint32 iterator = (uint32)ZERO; iterator < gradient->size; ++iterator)
+        {
+            gradient->data[iterator] *= scale;
         }
     }
+}
 
-    for(uint32 layer = ONE; layer < network->size; ++layer)
+double32 computeLoss(pTensor activations, pTensor truthValues)
+{
+    double loss = ZERO;
+    
+    for(uint32 iterator = (uint32)ZERO; iterator < activations->size; ++iterator)
     {
+        loss += truthValues->data[iterator] * log(activations->data[iterator]); 
+    }
+
+    return -loss;
+}
+
+void feedforward(pLayer layer, pTensor data, activations layerActivation)
+{
+    for(uint32 neuron = (uint32)ZERO; neuron < layer->size; ++neuron)
+    {
+        copyTensorData(layer->neurons[neuron].inputs, data);
+        layer->activations->data[neuron] = neuronCost(&layer->neurons[neuron]);
+        
+        assert(!isnan(layer->activations->data[neuron]));
+
+        NNDEBUG("activation value: %lf", layer->activations->data[neuron]);
+    }
+    activation(layer->activations, layerActivation);
+}
+
+void backpropagation(pNetwork network, pTensor actualValue)
+{
+    double32 learningRate = 0.00015;
+    NNDEBUG("Start backpropagation process");
+    pTensor gradient = substractTensors(network->layers[network->size - 1].activations, actualValue); //equates activation derivative
+    //printf("gradient\n");
+    //printTensor(gradient);
+    clipGradient(gradient);
+    copyTensorData(network->layers[network->size - 1].gradients, gradient);
+    for(uint32 neuron = ZERO; neuron < network->layers[network->size - 1].size; ++neuron)
+    {
+        network->layers[network->size - 1].neurons[neuron].bias -= learningRate * gradient->data[neuron];
+        for(uint32 iterator = (uint32)ZERO; iterator < network->layers[network->size - 1].neurons[neuron].weights->size; ++iterator)
+        {
+                network->layers[network->size - 1].neurons[neuron].weights->data[iterator] -= learningRate * gradient->data[neuron] * network->layers[network->size - 1].neurons[neuron].inputs->data[iterator];
+        }
+        //printf("gradient:%lf\n", gradient->data[neuron]);
+        //printTensor(network->layers[network->size - 1].neurons[neuron].weights);
+    }
+
+    for(sint32 layer = network->size - 2; layer >= 0; --layer)
+    {
+        /*NOTE: First we compute the sum of the gradient for the
+         *      weight which affects the output of the next layer neurons.
+         * */ 
         for(uint32 neuron = ZERO; neuron < network->layers[layer].size; ++neuron)
         {
-            network->layers[layer].neurons[neuron].inputs->data = network->layers[layer].activations;
-            for(uint32 index = ZERO; index < network->layers[(uint32)ZERO].size; ++index)
+            double32 gradientSum = ZERO;
+            for(uint32 iterator = (uint32)ZERO; iterator < network->layers[layer + 1].size; ++iterator)
             {
-                network->layers[(uint32)ZERO].activations[index] = network->layers[layer].activationFunction(network->layers[layer].neurons[neuron].inputs,
-                                                                                                             network->layers[layer].neurons[neuron].weights); 
-                result += network->layers[(uint32)ZERO].activations[index];
+                gradientSum += network->layers[layer + 1].neurons[iterator].weights->data[neuron] * network->layers[layer + 1].gradients->data[iterator];
+                //printf("weight:%lf * gradient:%lf\n", network->layers[network->size - 1].neurons[iterator].weights->data[neuron], gradient->data[iterator]);
             }
+            //printf("gradientSum:%lf\nlearning rate:%lf\nactivation derivative:%lf\n", gradientSum, learningRate, activationDerivative(network->layers[layer].activations->data[neuron], LRELU));
+            //Save the gradient sums into another vector in order to no deal with a pain in the ass refactoring.
+            network->layers[layer].gradients->data[neuron] = gradientSum;
+        }
         
-            for(uint32 weight = 0; weight < network->layers[(uint32)ZERO].neurons[(uint32)ZERO].inputSize; ++weight)
+        /*NOTE: After that we begin updadting the bias and the
+         *      weights on the hidden layers.
+         * */
+        clipGradient(network->layers[layer].gradients);
+        for(uint32 neuron = ZERO; neuron < network->layers[layer].size; ++neuron)
+        {
+            network->layers[layer].neurons[neuron].bias -= learningRate * (network->layers[layer].gradients->data[neuron] * activationDerivative(network->layers[layer].activations->data[neuron], LRELU));
+            for(uint32 iterator = (uint32)ZERO; iterator < network->layers[layer].neurons[neuron].weights->size; ++iterator)
             {
-            }
+                double32 grad = network->layers[layer].gradients->data[neuron] * activationDerivative(network->layers[layer].activations->data[neuron], LRELU);
+                //printf("relu layer gradient: %lf\n", grad);
+                network->layers[layer].neurons[neuron].weights->data[iterator] -= learningRate * (grad * network->layers[layer].neurons[neuron].inputs->data[iterator]);
+                if(isnan(network->layers[layer].activations->data[neuron]))
+                {
+                    printf("inputs:\n");
+                    printTensor(network->layers[layer].neurons[neuron].inputs);
+                    printf("weights:\n");
+                    printTensor(network->layers[layer].neurons[neuron].weights);
+                    printf("bias:%lf\n", network->layers[layer].neurons[neuron].bias);
+                }
+                //printf("Updated weight: %lf\n", network->layers[layer].neurons[neuron].weights->data[iterator]);
+            } 
         }
     }
+}
 
-    return result / network->layers[(uint32)ZERO].neurons[(uint32)ZERO].inputSize;
+double32 train(pNetwork network, pTensor data, pTensor actualValue)
+{
+    double32 loss = ZERO;
+
+    NNDEBUG("Begin network training");
+    
+    activations activation = LRELU;
+    for(uint32 layer = (uint32)ZERO; layer < network->size; ++layer)
+    {
+        if(layer == network->size - 1) activation = SOFTMAX;
+        if(layer == (uint32)ZERO) feedforward(&network->layers[layer], data, activation);
+        else feedforward(&network->layers[layer], network->layers[layer - 1].activations, activation);
+    }
+    //printTensor(network->layers[network->size - 1].activations);
+
+    backpropagation(network, actualValue);
+
+    loss = computeLoss(network->layers[network->size - 1].activations, actualValue);
+    loss /= network->layers[(uint32)ZERO].size;
+    
+    NNDEBUG("Ended network training process");
+    return loss; 
 }
 
 /* CREATION FUNCTIONS */
@@ -98,18 +276,25 @@ uint8 createNeuron(pNeuron neuron)
 uint8 createLayer(pLayer layer, uint32 inputSize)
 {
     layer->neurons = (pNeuron) malloc((sizeof *layer->neurons) * layer->size);
-    layer->activations = (pDouble32) malloc((sizeof *layer->activations) * layer->size);
+    layer->activations = (pTensor) malloc((sizeof *layer->activations));
+    layer->gradients = (pTensor) malloc((sizeof *layer->gradients));
 
-    if((layer->neurons == NULL) || (layer->activations == NULL))
+    if((layer->neurons == NULL) || (layer->activations == NULL) || (layer->gradients == NULL))
     {
         NNERROR("ERROR: Could not create layer!\n");
         return UNINITIALIZED_POINTER;
     }
 
-    for(uint32 iterator = ZERO; iterator < layer->size; ++iterator)
+    layer->activations->size = layer->size;
+    layer->gradients->size = layer->size;
+    initializeTensor(layer->activations);
+    initializeTensor(layer->gradients);
+
+    for(uint32 iterator = (uint32)ZERO; iterator < layer->size; ++iterator)
     {
         layer->neurons[iterator].inputSize = inputSize;
-        if(createNeuron(&layer->neurons[iterator]) != SUCCESS)
+        
+        if(createNeuron(&layer->neurons[iterator]) != SUCCESS) 
         {
             NNERROR("ERROR: Could not create neurons layer!\n");
             return GENERIC_ERROR_CODE;
@@ -119,7 +304,7 @@ uint8 createLayer(pLayer layer, uint32 inputSize)
     return SUCCESS;
 }
 
-void createNetwork(pNetwork network, uint32 size, uint32 layerSize, uint32 inputSize)
+void createNetwork(pNetwork network, uint32 size, pUInt32 layerSize, pUInt32 inputSizePerLayer)
 {
     network->size = size;
     network->layers = (pLayer) malloc((sizeof *network->layers) * size);
@@ -130,10 +315,13 @@ void createNetwork(pNetwork network, uint32 size, uint32 layerSize, uint32 input
         freeNetwork(network);
     }
 
-    for(uint32 iterator = 0; iterator < network->size; ++iterator)
+    for(uint32 iterator = (uint32)ZERO; iterator < network->size; ++iterator)
     {
-        network->layers[iterator].size = layerSize;
-        if(createLayer(&network->layers[iterator], inputSize) != SUCCESS)
+
+        network->layers[iterator].size = layerSize[iterator];
+        uint32 neuronsInputSize = inputSizePerLayer[iterator]; 
+    
+        if(createLayer(&network->layers[iterator], neuronsInputSize) != SUCCESS)
         {
             NNERROR("ERROR: Could not create network layers!\n");
             freeNetwork(network);
@@ -149,8 +337,6 @@ void freeNeuron(pNeuron neuron)
     neuron->inputs = NULL;
     freeTensor(neuron->weights);
     neuron->weights = NULL;
-
-    neuron->inputSize  = ZERO;
 }
 
 void freeLayer(pLayer layer)
@@ -159,11 +345,16 @@ void freeLayer(pLayer layer)
     {
         freeNeuron(&layer->neurons[iterator]);
     }
+    free(layer->neurons);
     layer->neurons = NULL;
     
-    memset(&layer->activations, (double32)ZERO, layer->size);
-    layer->activationFunction = NULL;
-    layer->size = ZERO;
+    freeTensor(layer->activations);
+    layer->activations = NULL;
+
+    freeTensor(layer->gradients);
+    layer->gradients = NULL;
+
+    //layer->activationFunction = NULL;
 }
 
 void freeNetwork(pNetwork network)
@@ -172,6 +363,7 @@ void freeNetwork(pNetwork network)
     {
         freeLayer(&network->layers[iterator]);
     }
+    free(network->layers);
     network->layers = NULL;
     
     network->size = ZERO;
@@ -182,17 +374,18 @@ void initializeNeuron(pNeuron neuron)
 {
     zeroTensor(neuron->inputs);
     randomizeTensor(neuron->weights);
+    neuron->bias = (double32) rand() / (double32) (RAND_MAX / 0.2);
 }
 
 void initializeLayer(pLayer layer)
 {
     for(uint32 iterator = 0; iterator < layer->size; ++iterator)
     {
-        layer->activations[iterator] = (double32)ZERO;
+        zeroTensor(layer->activations);
         initializeNeuron(&layer->neurons[iterator]);
     }
 
-    layer->activationFunction   = activation;
+    //layer->activationFunction   = activation;
 }
 
 void initializeNetwork(pNetwork network)
@@ -269,8 +462,8 @@ void testLayer(void)
     uint32 inputSize = 10;
     createLayer(&l, inputSize);
     assert(l.size != ZERO);
-    assert(l.activationFunction == NULL);
-    assert(l.activationFunction == NULL);
+    //assert(l.activationFunction == NULL);
+    //assert(l.activationFunction == NULL);
     assert(l.neurons != NULL);
     NNDEBUG("--- LAYER SUCCESSFULY BUILT ---\n\n");
 
@@ -287,7 +480,7 @@ void testLayer(void)
     freeLayer(&l);
     assert(l.size == ZERO);
     assert(l.neurons == NULL);
-    assert(l.activationFunction == NULL);
+    //assert(l.activationFunction == NULL);
     NNDEBUG("--- LAYER FREED ---\n\n");
 }
 
@@ -295,7 +488,9 @@ void testNetwork(void)
 {
     NNDEBUG("--- CREATE NEURAL NETWORK ---\n");
     network n;
-    createNetwork(&n, 3, 5, 10);
+    uint32 layerSizes[] = {3, 5, 1},
+           inputSize[] = {3, 5, 1};
+    createNetwork(&n, 3, layerSizes, inputSize);
     assert(n.size != ZERO);
     assert(n.layers != NULL);
     NNDEBUG("--- NEURAL NETWORK CREATED ---\n\n");
@@ -319,24 +514,287 @@ void testNetwork(void)
     NNDEBUG("--- NEURAL NETWORK FREED ---\n\n");
 }
 
+void processData(const pSChar8 source, pCicDataset dataset)
+{
+    tcpString data;
+    uint32 read = fileReading(source, &data);
+    if(read == READ_ERROR)
+    {
+        free(data.data);
+        data.data = NULL;
+        NNERROR("Could not read data file!\n");
+        return;
+    }
+
+    parseCsvData(&data, dataset);
+    free(data.data);
+    data.data = NULL;
+    
+    normalizeCsvData(dataset, dataset->rows);
+}
+
+void validationFeedForward(pNetwork network, pTensor data)
+{
+    activations activation = LRELU;
+    for(uint32 layer = (uint32)ZERO; layer < network->size; ++layer)
+    {
+        if(layer == network->size - 1) activation = SOFTMAX;
+        if(layer == (uint32)ZERO) feedforward(&network->layers[layer], data, activation);
+        else feedforward(&network->layers[layer], network->layers[layer - 1].activations, activation);
+    }
+
+     NNDEBUG("Initialize input layer with training data");
+}
+
+void test(pCicDataset dataset, pNetwork network)
+{
+    tensor data, actualValue;
+    data.size = dataset->featuresColumns;
+    actualValue.size = dataset->labelsColumns;
+    uint32 TP = ZERO,
+           TN = ZERO,
+           FP = ZERO,
+           FN = ZERO;
+
+    for(uint32 row = 0; row < dataset->rows; ++row)
+    {
+        data.data = &dataset->features[(row * dataset->featuresColumns)];
+        actualValue.data = &dataset->labels[(row * dataset->labelsColumns)];
+        validationFeedForward(network, &data);
+        pTensor predictionError = substractTensors(network->layers[network->size - 1].activations, &actualValue); //equates activation derivative
+        squareTensor(predictionError);
+        
+        double32 loss = computeLoss(network->layers[network->size - 1].activations, &actualValue);
+        loss /= network->layers[(uint32)ZERO].size;
+
+        NNINFO("Validation loss:%lf", loss);
+        
+        printTensor(network->layers[network->size - 1].activations);
+        printTensor(&actualValue);
+        printTensor(predictionError);
+
+        if(actualValue.data[0] == ONE)
+        {
+            if(fabs(predictionError->data[0]) < 0.3)
+            {
+                ++TP;
+            }else
+            {
+                ++FN;       
+            }
+        }else if(actualValue.data[1] == ONE)
+        {
+            if(fabs(predictionError->data[1]) > 0.6)
+            {
+                ++FP;
+            }else 
+            {
+                ++TN;
+            }
+            
+        }
+    }
+    
+    uint32 total = TP + TN + FP + FN;
+    printf("Network Accuracy:%lf\n", (double32)((double32)(TP + TN) / total));
+    printf("True Positive: %d\nTrue Negative: %d\nFalse Positive: %d\nFalse Negative: %d\n", TP, TN, FP, FN);
+}
+
+void copyData(pCicDataset mix, pCicDataset dataset)
+{
+    uint32 MAX_DATASET_LIMT = 700000;
+
+    if(dataset->rows < MAX_DATASET_LIMT)
+    {
+        MAX_DATASET_LIMT = dataset->rows;
+    }
+
+    for(uint32 iterator = (uint32)ZERO; iterator < MAX_DATASET_LIMT; ++iterator)
+    {
+        for(uint32 column = (uint32)ZERO; column < dataset->featuresColumns; ++column)
+        {
+            mix->features[((mix->rows + iterator) * mix->featuresColumns) + column] = dataset->features[(iterator * dataset->featuresColumns) + column];
+        }
+
+        for(uint32 column = (uint32)ZERO; column < dataset->labelsColumns; ++column)
+        {
+            mix->labels[((mix->rows + iterator) * mix->labelsColumns) + column] = dataset->labels[(iterator * dataset->labelsColumns) + column];
+        }
+    }
+
+    mix->rows += MAX_DATASET_LIMT;
+}
+
+void suffleData(pCicDataset mix)
+{
+
+    srand((unsigned) time(NULL));
+    for(uint32 row = (uint32)ZERO; row < mix->rows; ++row)
+    {
+        uint32 first = rand() / (RAND_MAX / mix->rows),
+               second = rand() / (RAND_MAX / mix->rows); 
+        for(uint32 column = (uint32)ZERO; column < mix->featuresColumns; ++column)
+        {
+           double32 temp = mix->features[(first * mix->featuresColumns) + column];
+           mix->features[(first * mix->featuresColumns) + column] = mix->features[(second * mix->featuresColumns) + column];
+           mix->features[(second * mix->featuresColumns) + column] = temp;
+        }
+
+        for(uint32 column = (uint32)ZERO; column < mix->labelsColumns; ++column)
+        {
+           double32 temp = mix->labels[(first * mix->labelsColumns) + column];
+           mix->labels[(first * mix->labelsColumns) + column] = mix->labels[(second * mix->labelsColumns) + column];
+           mix->labels[(second * mix->labelsColumns) + column] = temp;
+        }
+    }
+}
+
 int main(void)
 {
   //  testNeuron();
   //  testLayer();
   //  testNetwork();
-    NNDEBUG("Construct neural network");
+
+    pSChar8 source[11] = {"/home/catalin/Datasets/CIC_2019/03-11/Portmap.csv",
+                        "/home/catalin/Datasets/CIC_2019/03-11/LDAP.csv",
+                        "/home/catalin/Datasets/CIC_2019/03-11/MSSQL.csv",
+                        "/home/catalin/Datasets/CIC_2019/03-11/NetBIOS.csv",
+                        "/home/catalin/Datasets/CIC_2019/03-11/Syn.csv",
+                        "/home/catalin/Datasets/CIC_2019/03-11/UDP.csv",
+                        "/home/catalin/Datasets/CIC_2019/01-12/DrDoS_DNS.csv",
+                        "/home/catalin/Datasets/CIC_2019/01-12/DrDoS_LDAP.csv",
+                        "/home/catalin/Datasets/CIC_2019/01-12/DrDoS_MSSQL.csv",
+                        "/home/catalin/Datasets/CIC_2019/01-12/DrDoS_NetBIOS.csv",
+                        "/home/catalin/Datasets/CIC_2019/01-12/DrDoS_NTP.csv",
+                        };
+    cic_dataset dataset, mix;
     network n;
-    createNetwork(&n, 3, 2000, 2000);
-    initializeNetwork(&n);
+    uint32 layerSizes[3],
+           inputSize[3];
+    
+    uint32 datasetMixSize = 9800000;
+    mix.featuresColumns = 60;
+    mix.labelsColumns = 2;
+    mix.rows = (uint32)ZERO;
+    mix.features = malloc((sizeof *mix.features) * datasetMixSize * mix.featuresColumns);
+    mix.labels = malloc((sizeof *mix.labels) * datasetMixSize * mix.labelsColumns);
+        
+    for(uint32 sources = 0; sources < 11; ++sources)
+    {
+        NNINFO("process: %s\n", source[sources]);
+        processData(source[sources], &dataset);
+            
+        for(uint32 line = 0; line < dataset.rows; ++line)
+        {
+            for(uint32 column = 0; column < 60; ++column)
+            {
+                assert(!isnan(dataset.features[(line * 60) + column]));
+                assert(!isinf(dataset.features[(line * 60) + column]));
+            }
+        }
 
-    NNDEBUG("Create test data");
-    tensor data;
-    data.size = 2000;
-    initializeTensor(&data);
-    randomizeTensor(&data);
+        if(sources == 0)
+        {
+            layerSizes[0] = dataset.featuresColumns; 
+            layerSizes[1] = dataset.featuresColumns / 4;
+            layerSizes[2] = dataset.labelsColumns;
+            
+            inputSize[0] = dataset.featuresColumns;
+            inputSize[1] = dataset.featuresColumns;
+            inputSize[2] = dataset.featuresColumns / 4;
+            NNDEBUG("Construct neural network");
+            createNetwork(&n, 3, layerSizes, inputSize);
+            initializeNetwork(&n);
+        }
+        copyData(&mix, &dataset);
 
-    NNDEBUG("Compute network cost");
-    double32 totalcost = cost(&n, &data);
-    NNINFO("Network cost: %lf", (totalcost / data.size) * 100);
+        free(dataset.features);
+        dataset.features = NULL;
+        free(dataset.labels);
+        dataset.labels = NULL;
+    }
+
+    suffleData(&mix);
+    for(uint32 line = 0; line < mix.rows; ++line)
+    {
+        for(uint32 column = 0; column < 60; ++column)
+        {
+            assert(!isnan(mix.features[(line * 60) + column]));
+            assert(!isinf(mix.features[(line * 60) + column]));
+        }
+    }
+
+    NNINFO("Start Network training");
+
+    printf("intra in loop\n");
+    uint32 epochPatience = 5,
+           noImprovement = (uint32)ZERO,
+           epoch = (uint32)ZERO,
+           maxEpochs = 10;
+    double32 validationLoss = ZERO,
+             epsilon = 1e-5,
+             bestValue = 9999.9999;
+
+    while(epoch < maxEpochs && noImprovement < epochPatience)
+    {
+ 
+        tensor data, actualValue;
+        data.size = mix.featuresColumns;
+        actualValue.size = mix.labelsColumns;   
+        
+        for(uint32 line = (uint32)ZERO; line < mix.rows; ++line)
+        {
+            NNDEBUG("Iteration: %d", line);
+            data.data = &mix.features[(line * mix.featuresColumns)];
+            actualValue.data = &mix.labels[(line * mix.labelsColumns)];
+            double32 returnCost = train(&n, &data, &actualValue);
+            NNINFO("Network cost: %lf", returnCost);
+        }
+        
+        cic_dataset temp;
+        processData("/home/catalin/Datasets/CIC_2019/test.csv", &temp);
+        data.size = temp.featuresColumns;
+        actualValue.size = temp.labelsColumns;
+        for(uint32 row = 0; row < temp.rows; ++row)
+        {
+            data.data = &temp.features[(row * temp.featuresColumns)];
+            actualValue.data = &temp.labels[(row * temp.labelsColumns)];
+            validationFeedForward(&n, &data);
+            pTensor predictionError = substractTensors(n.layers[n.size - 1].activations, &actualValue); //equates activation derivative
+            squareTensor(predictionError);
+        
+            double32 loss = computeLoss(n.layers[n.size - 1].activations, &actualValue);
+            loss /= n.layers[(uint32)ZERO].size;
+            validationLoss += loss;
+        }
+        free(temp.features);
+        temp.features = NULL;
+        free(temp.labels);
+        temp.labels = NULL;
+
+        if(validationLoss + epsilon < bestValue)
+        {
+            bestValue = validationLoss;
+            noImprovement = (uint)ZERO;
+        }else ++noImprovement;
+    
+        ++epoch;
+    }
+
+    NNINFO("Network training completed!");
+
+    free(mix.features);
+    mix.features = NULL;
+    free(mix.labels);
+    mix.labels = NULL;
+    
+    processData("/home/catalin/Datasets/CIC_2019/test.csv", &dataset);
+    test(&dataset, &n);
+        
+    free(dataset.features);
+    dataset.features = NULL;
+    free(dataset.labels);
+    dataset.labels = NULL;
+    freeNetwork(&n);
     return 0;
 }
