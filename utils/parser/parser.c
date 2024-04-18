@@ -136,12 +136,13 @@ uint32 fileReading(const pSChar8 source, pTcpString data)
         printf("ERROR: Cannot open source file!\n");
         return readResult;
     }
-    
+
+
     data->data = (pSChar8) malloc(((sizeof *data->data) * sourceSize) + 1);
     if(data->data == NULL) return readResult;
 
     readResult = read(descriptor, data->data, sourceSize);
-    data->size = readResult;
+    data->size = readResult; 
     data->lines = getNumberOfLines(data);
     close(descriptor);
 

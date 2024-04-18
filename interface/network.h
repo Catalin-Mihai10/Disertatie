@@ -4,9 +4,21 @@
 #include "constants.h"
 #include "tensor.h"
 
+/**
+ * @brief structure that represents a neuron of a
+ * layer in the neural network. 
+ *
+ * bias                - a 32 bit double that represents the bias of the
+ *                       neuron;
+ * 
+ * inputs              - a pointer to a tensor structure that represents
+ *                       the input values of the current neuron;
+ *
+ * weights             - a pointer to a tensor structure that represents
+ *                       the of the current neuron.
+ */
 typedef struct neuron
 {
-    uint32  inputSize;
     double32 bias;
     pTensor inputs,
             weights;
@@ -21,25 +33,19 @@ typedef neuron* pNeuron;
  * size                - an unsigned 32 bit integer that represents the 
  *                       number of neurons in the layer;
  *
+ * activations         - a pointer to a tensor structure that represents
+ *                       the values of the activation function of the neurons
+ *                       on the current layer;
+ * 
+ * gradients           - a pointer to a tensor structure that represents
+ *                       the gradient values of the current layer;
+ *
  * neurons             - a pointer to a tensor structure that represents
  *                       the neurons of the layer.
- *
- * weights             - a pointer to a tensor structure that represents
- *                       the weights of the layer.
- *
- * activationFunction  - a pointer to a function that return a 32 bit
- *                       floating point number representing the activation
- *                       of the layer. It can take values between [0.0, 1.0]
- * 
- * lossFunction        - a pointer to a function that returns a 32 bit 
- *                       floating point number representing the accuracy
- *                       of the prediction at the respective layer. It can
- *                       take values between [0.0, 1.0]
  */
 typedef struct layer
 {
     uint32 size;
-    //double32 (*activationFunction)  (pTensor inputs, pTensor weights);
     pTensor activations,
             gradients;
     pNeuron neurons;
@@ -51,7 +57,7 @@ typedef layer* pLayer;
  * @brief structure that represents a neural network.
  *
  * size     - an unsigned 32 bit integer that represents the number of
- *            hidden layers in the neural network.
+ *            hidden layers in the neural network;
  *
  * layers   - a pointer to layer structure.
  */
@@ -64,16 +70,8 @@ typedef struct network
 
 typedef network* pNetwork;
 
-typedef enum activations 
-{
-    RELU = 0x00,
-    LRELU,
-    PRELU,
-    SOFTMAX
-} activations;
-
 /* CREATE FUNCTIONS */
-uint8 createNeuron(pNeuron neuron);
+uint8 createNeuron(pNeuron neuron, uint32 inputSize);
 uint8 createLayer(pLayer layer, uint32 inputSize);
 void  createNetwork(pNetwork network, uint32 size, pUInt32 layerSize, pUInt32 inputSizePerLayer);
 
@@ -85,9 +83,6 @@ void freeNetwork(pNetwork network);
 void initializeNeuron(pNeuron neuron);
 void initializeLayer(pLayer layer);
 void initializeNetwork(pNetwork network);
-
-/*  */
-void setLayerActivationFunction(uint8 type);
 
 /* HELPFUL FUNCTIONS */
 void printNetworkParameters(pNetwork network);

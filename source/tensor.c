@@ -10,7 +10,7 @@
 
 uint8 initializeTensor(pTensor T)
 {
-    if(T->size == ZERO)
+    if(T->size == (uint32)ZERO)
     {
         NNERROR("ERROR: Invalid Tensor size: %u!\n", T->size);
         return TENSOR_WRONG_SIZE;
@@ -27,20 +27,18 @@ uint8 initializeTensor(pTensor T)
     return SUCCESS;
 }
 
-/*
- * TODO: memset may not assure that the values of the 
- * tensor will be initialized to floating point 0.0,
- * try to see if there is a better approach to this
- * and not less efficient then memset.
-*/
 void zeroTensor(pTensor T)
 {
-    memset(T->data, ZERO, (sizeof T->data) * T->size);
+    for(uint32 iterator = (uint32)ZERO; iterator < T->size; ++iterator)
+    {
+        T->data[iterator] = ZERO;
+    }
+
 }
 
 void onesTensor(pTensor T)
 {
-    for(uint32 iterator = ZERO; iterator < T->size; ++iterator)
+    for(uint32 iterator = (uint32)ZERO; iterator < T->size; ++iterator)
     {
         T->data[iterator] = ONE;
     }
@@ -50,7 +48,7 @@ void randomizeTensor(pTensor T)
 {
     srand((unsigned) time(NULL));
 
-    for(uint32 iterator = ZERO; iterator < T->size; ++iterator)
+    for(uint32 iterator = (uint32)ZERO; iterator < T->size; ++iterator)
     {
         T->data[iterator] = ((double32) rand() / (double32) (RAND_MAX)) * 2 - 1; 
     }
@@ -61,7 +59,7 @@ void heUniformInitialization(pTensor T)
     srand((unsigned) time(NULL));
 
     double32 positiveThreshold = sqrt(6.0/T->size),
-             negativeThreshold = -sqrt(6.0/T->size);
+             negativeThreshold = -positiveThreshold;
     for(uint32 iterator = (uint32)ZERO; iterator < T->size; ++iterator)
     {
         T->data[iterator] = ((double32) rand() / (double32) (RAND_MAX)) * fabs(negativeThreshold - positiveThreshold) + negativeThreshold; 
@@ -96,7 +94,7 @@ void copyTensor(pTensor T1, pTensor T2)
 
 void addScalar(pTensor T1, double32 scalar)
 {
-    if(T1->size == 0)
+    if(T1->size == (uint32)ZERO)
     {
         NNERROR("Tensor invalid size!");
         return;
@@ -110,7 +108,7 @@ void addScalar(pTensor T1, double32 scalar)
 
 void substractScalar(pTensor T1, double32 scalar)
 {
-    if(T1->size == 0)
+    if(T1->size == (uint32)ZERO)
     {
         NNERROR("Tensor invalid size!");
         return;
@@ -124,7 +122,7 @@ void substractScalar(pTensor T1, double32 scalar)
 
 void multiplyScalar(pTensor T1, double32 scalar)
 {
-    if(T1->size == 0)
+    if(T1->size == (uint32)ZERO)
     {
         NNERROR("Tensor invalid size!");
         return;
@@ -138,7 +136,7 @@ void multiplyScalar(pTensor T1, double32 scalar)
 
 void divideScalar(pTensor T1, double32 scalar)
 {
-    if(T1->size == 0)
+    if(T1->size == (uint32)ZERO)
     {
         NNERROR("Tensor invalid size!");
         return;
@@ -194,7 +192,7 @@ void multiplyTensor(pTensor T1, pTensor T2)
 
 void squareTensor(pTensor T)
 {
-    if(T->size == 0)
+    if(T->size == (uint32)ZERO)
     {
         NNERROR("Tensor empty!");
         return;
