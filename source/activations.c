@@ -3,7 +3,6 @@
 #include <math.h>
 #include <float.h>
 
-/* ACTIVATIONS IMPLEMENTATION */
 double32 sigmoid(double32 data)
 {
     return ONE / (ONE + expf((-ONE) * data));
@@ -79,7 +78,6 @@ void activation(pTensor values, activations activation)
     }
 }
 
-/* DERIVATIVES IMPLEMENTATION */
 double32 leakyReluDerivative(double32 data)
 {
     double param = 0.01;

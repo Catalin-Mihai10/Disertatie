@@ -2,6 +2,7 @@
 #include "../utils/logger/NNLogger.h"
 #include <string.h>
 #include <math.h>
+#include <pthread.h>
 
 /* DEFINE MACROS */
 #define GetVarName(var) #var

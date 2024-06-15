@@ -3,6 +3,7 @@
 #include "../utils/logger/NNLogger.h"
 #include "../utils/parser/parser.h"
 #include "../utils/parser/dataProcessing.h"
+#include "../utils/loader/loader.h"
 
 #include <float.h>
 #include <math.h>
@@ -465,18 +466,18 @@ void test(pCicDataset dataset, pNetwork network)
         printTensor(&actualValue);
         printTensor(predictionError);
 
-        if(actualValue.data[0] == ONE)
+        if(actualValue.data[1] == ONE)
         {
-            if(fabs(predictionError->data[0]) < 0.3)
+            if(fabs(predictionError->data[1]) < 0.9)
             {
                 ++TP;
             }else
             {
                 ++FN;       
             }
-        }else if(actualValue.data[1] == ONE)
+        }else if(actualValue.data[0] == ONE)
         {
-            if(fabs(predictionError->data[1]) > 0.6)
+            if(fabs(predictionError->data[0]) > 0.9)
             {
                 ++FP;
             }else 
@@ -488,11 +489,15 @@ void test(pCicDataset dataset, pNetwork network)
     }
     
     uint32 total = TP + TN + FP + FN;
-    NNINFO("Network Accuracy:%lf\n", (double32)((double32)(TP + TN) / total));
+    
+    double32 accuracy = (double32)((double32)(TP + TN) / total),
+             recall = (double32)((double32)(TP) / (TP + FN)),
+             precision = (double32)((double32)(TP) / (TP + FP)),
+             f1 = 2.0 * (double32)((precision * recall) / (precision + recall)),
+             specificity = (double32)((double32)(TN) / (TN + FP));
+    NNINFO("Precision:%lf\nRecall:%lf\nF1 Score:%lf\nSpecificity:%lf\nAccuracy:%lf\n", precision, recall, f1, specificity, accuracy);
     NNINFO("True Positive: %d\nTrue Negative: %d\nFalse Positive: %d\nFalse Negative: %d\n", TP, TN, FP, FN);
 }
-
-
 
 
 int main(void)
@@ -520,6 +525,7 @@ int main(void)
     
     uint32 datasetMixSize = 9800000;
     mix.featuresColumns = 60;
+    //mix.featuresColumns = 10;
     mix.labelsColumns = 2;
     mix.rows = (uint32)ZERO;
     mix.features = malloc((sizeof *mix.features) * datasetMixSize * mix.featuresColumns);
@@ -529,6 +535,7 @@ int main(void)
     {
         NNDEBUG("process: %s\n", source[sources]);
         processData(source[sources], &dataset);
+        NNDEBUG("after process");
         checkAndCleanData(&dataset);
         copyData(&mix, &dataset);
 
@@ -556,13 +563,13 @@ int main(void)
            noImprovement = (uint32)ZERO,
            epoch = (uint32)ZERO,
            maxEpochs = 5;
-    double32 validationLoss = ZERO,
-             bestValue = DBL_MAX;
+    //double32 validationLoss = ZERO,
+    //         bestValue = DBL_MAX;
 
     NNINFO("Start Network training");
     while(epoch < maxEpochs && noImprovement < epochPatience)
     {
- 
+        NNINFO("Epoch:%d", epoch);
         tensor data, actualValue;
         data.size = mix.featuresColumns;
         actualValue.size = mix.labelsColumns;   
@@ -573,9 +580,10 @@ int main(void)
             data.data = &mix.features[(line * mix.featuresColumns)];
             actualValue.data = &mix.labels[(line * mix.labelsColumns)];
             double32 returnCost = train(&n, &data, &actualValue);
-            NNINFO("Network cost: %lf", returnCost);
+            
+            if((line % 500000) == 0) NNINFO("Network cost: %lf", returnCost);
         }
-        /* Early stopping implementation. Uncomment to enable it.
+        /*Early stopping implementation. Uncomment to enable it.
         cic_dataset temp;
         processData("/home/catalin/Datasets/CIC_2019/test.csv", &temp);
         data.size = temp.featuresColumns;
@@ -616,17 +624,23 @@ int main(void)
     free(mix.labels);
     mix.labels = NULL;
    
+    system("echo root | sudo -S sh -c 'echo 3 > /proc/sys/vm/drop_caches'");
+    
+    NNINFO("Begin Network inference!");
     processData("/home/catalin/Datasets/CIC_2019/test.csv", &validation);
-    suffleData(&validation);
+    NNINFO("Clean validation data!");
     checkAndCleanData(&validation);
     
     NNINFO("Start validation process!");
     test(&validation, &n);
-        
+
     free(validation.features);
     validation.features = NULL;
     free(validation.labels);
     validation.labels = NULL;
+    
+    printNetworkParameters(&n);
+
     freeNetwork(&n);
     return 0;
 }

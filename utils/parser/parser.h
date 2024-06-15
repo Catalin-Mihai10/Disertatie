@@ -136,6 +136,8 @@ void analyzePacket(pPcapPacket packet);
 void handlePackets(pUChar8 arguments, pPcap_pkthdr header, cpUChar8 packet);
 void parsePcapFile(const pSChar8 source);
 void parseCsvData(pTcpString data, pCicDataset dataset);
+void parseCsvData_less_features(pTcpString data, pCicDataset dataset);
+void parseKDD(pTcpString data, pCicDataset dataset);
 void printPacket(pPcapPacket packet);
 
 void normalizeCsvData(pCicDataset dataset, uint32 size);

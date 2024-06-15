@@ -99,10 +99,10 @@ void processData(const pSChar8 source, pCicDataset dataset)
         printf("Could not read data file!\n");
         return;
     }
-
     parseCsvData(&data, dataset);
+    //parseCsvData_less_features(&data, dataset);
+    //parseKDD(&data, dataset);
     free(data.data);
     data.data = NULL;
-    
     normalizeCsvData(dataset, dataset->rows);
 }

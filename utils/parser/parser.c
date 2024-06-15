@@ -136,14 +136,14 @@ uint32 fileReading(const pSChar8 source, pTcpString data)
         printf("ERROR: Cannot open source file!\n");
         return readResult;
     }
-
-
     data->data = (pSChar8) malloc(((sizeof *data->data) * sourceSize) + 1);
     if(data->data == NULL) return readResult;
-
+ 
+    
     readResult = read(descriptor, data->data, sourceSize);
     data->size = readResult; 
     data->lines = getNumberOfLines(data);
+    
     close(descriptor);
 
     if(readResult < 0)
@@ -377,11 +377,14 @@ void parseCsvData(pTcpString data, pCicDataset dataset)
                     case 87:
                     {
                         uint8 index;
-                        if((strcmp(element, "UDP") == 0) || (strcmp(element, "Syn") == 0) || (strcmp(element, "Portmap") == 0) ||
-                           (strcmp(element, "NetBIOS") == 0) || (strcmp(element, "MSSQL") == 0) || (strcmp(element, "LDAP") == 0) ||
-                           (strcmp(element, "BENIGN") == 0))
+                        if((strcmp(element, "BENIGN") == 0))
                         {
                             index = 0;
+                        }
+                        else if((strcmp(element, "UDP") == 0) || (strcmp(element, "Syn") == 0) || (strcmp(element, "Portmap") == 0) ||
+                           (strcmp(element, "NetBIOS") == 0) || (strcmp(element, "MSSQL") == 0) || (strcmp(element, "LDAP") == 0) || (strcmp(element, "TFTP") == 0))
+                        {
+                            index = 1;
                         }
                         else if((strcmp(element, "DrDoS_DNS") == 0) || (strcmp(element, "DrDoS_LDAP") == 0) || (strcmp(element, "DrDoS_MSSQL") == 0) ||
                            (strcmp(element, "DrDoS_NetBIOS") == 0) || (strcmp(element, "DrDoS_NTP") == 0) || (strcmp(element, "DrDoS_SNMP") == 0) ||
@@ -424,7 +427,7 @@ void parseCsvData(pTcpString data, pCicDataset dataset)
         line = strtok_r(NULL, "\n", &tempLine);
     }
 
-    for(uint32 ips = 0; ips < ipCount; ++ips)
+    for(uint32 ips = 0; ips < 10000; ++ips)
     {
         free(ip[ips]);
         ip[ips] = NULL;
@@ -435,61 +438,323 @@ void parseCsvData(pTcpString data, pCicDataset dataset)
 
 void normalizeCsvData(pCicDataset dataset, uint32 size)
 {
-    double32 maxValue[60], minValue[60];
-    for(uint32 column = 0; column < 60; ++column)
+    double32 maxValue[60], minValue[60], epsilon = 1e-6;
+    for(uint32 column = 0; column < dataset->featuresColumns; ++column)
     {
         maxValue[column] = dataset->features[column];
         minValue[column] = 0xFFFFFF;
-        for(uint32 line = 1; line < size; ++line)
+        for(uint32 line = (uint32)ONE; line < size; ++line)
         {
-            if(maxValue[column] < dataset->features[(line * 60) + column])
+            if(maxValue[column] < dataset->features[(line * dataset->featuresColumns) + column])
             {
-                maxValue[column] = dataset->features[(line * 60) + column];
+                maxValue[column] = dataset->features[(line * dataset->featuresColumns) + column];
             }
-            if(minValue[column] > dataset->features[(line * 60) + column])
+            if(minValue[column] > dataset->features[(line * dataset->featuresColumns) + column])
             {
-                minValue[column] = dataset->features[(line * 60) + column];
+                minValue[column] = dataset->features[(line * dataset->featuresColumns) + column];
             }
         }
     }
 
-    for(uint32 line = 0; line < size; ++line)
+    for(uint32 line = (uint32)ZERO; line < size; ++line)
     {
-        for(uint32 column = 0; column < 60; ++column)
+        for(uint32 column = (uint32)ZERO; column < dataset->featuresColumns; ++column)
         {
-            double32 numerator = fabs(dataset->features[(line * 60) + column] - minValue[column]),
+            double32 numerator = fabs(dataset->features[(line * dataset->featuresColumns) + column] - minValue[column]),
                      denominator = fabs(maxValue[column] - minValue[column]);
             if((numerator != 0) && (denominator != 0))
             {
-                dataset->features[(line * 60) + column] = numerator / denominator; 
+                dataset->features[(line * dataset->featuresColumns) + column] = numerator / denominator; 
             }else if((numerator != 0) && (denominator == 0)){
-                dataset->features[(line * 60) + column] = numerator;
+                dataset->features[(line * dataset->featuresColumns) + column] = numerator;
             }else {
-                dataset->features[(line * 60) + column] = 0x00;
+                dataset->features[(line * dataset->featuresColumns) + column] = epsilon;
             }
         }
     }
     
-    for(uint32 line = 0; line < size; ++line)
+    for(uint32 line = (uint32)ZERO; line < size; ++line)
     {
-        for(uint32 column = 0; column < 60; ++column)
+        for(uint32 column = (uint32)ZERO; column < dataset->featuresColumns; ++column)
         {
-            if(isnan(dataset->features[(line * 60) + column]))
+            if(isnan(dataset->features[(line * dataset->featuresColumns) + column]))
             {
-                dataset->features[(line * 60) + column] = 0x00;
-            }else if(isinf(dataset->features[(line * 60) + column]))
+                dataset->features[(line * dataset->featuresColumns) + column] = epsilon;
+            }else if(isinf(dataset->features[(line * dataset->featuresColumns) + column]))
             {
-                dataset->features[(line * 60) + column] = 1.00;
+                dataset->features[(line * dataset->featuresColumns) + column] = ONE;
             }
         }
     }
  
 }
 
+void parseKDD(pTcpString data, pCicDataset dataset)
+{
+    //TODO: make assigning of columns and rows dynamic.
+    dataset->features = malloc((sizeof *dataset->features) * data->lines * 41);
+    dataset->featuresColumns = 41;
+    dataset->labels = malloc((sizeof *dataset->labels) * data->lines * 2);
+    dataset->labelsColumns = 2;
+    dataset->rows = data->lines;
+    memset(dataset->labels, 0x00, (sizeof *dataset->labels) * data->lines * 2);
+
+    pSChar8 tempLine, tempElement;
+    pSChar8 line = strtok_r(data->data, "\n", &tempLine);
+    uint32 count = 0,
+          elemCount = 0,
+          elemCountGlobal = 0,
+          firstLine = 0,
+          ipCount = 0;
+
+    pSChar8 *ip = malloc((sizeof *ip) * 10000);
+    for(uint32 ipt = 0; ipt < 10000; ++ipt)
+    {
+        ip[ipt] = malloc((sizeof **ip) * 200);
+    }
+    while(line != NULL)
+    {
+        if(firstLine != 0)
+        {
+            pSChar8 element = strtok_r(line, ",\n", &tempElement);
+            while(element != NULL)
+            {
+                //printf("element before parsing: %s -- %d\n", element, elemCountGlobal);
+                switch(elemCountGlobal)
+                {
+                    case 0:
+                    case 4:
+                    case 5:
+                    case 22:
+                    case 23:
+                    case 31:
+                    case 32:
+                    {
+                        dataset->features[(count * dataset->featuresColumns) + elemCount] = atof(element);
+                        ++elemCount;
+                        ++elemCountGlobal; 
+                    } break;
+                    case 1:
+                    case 2:
+                    case 3:
+                    {
+                        //printf("element: %s\n", element);
+                        sint32 index = -1;
+                        for(uint32 it = 0; it < ipCount; ++it)
+                        {
+                            //printf("compare: %s with %s\n", ip[it], element);
+                            if(strcmp(ip[it], element) == 0)
+                            {
+                                index = it;
+                                //printf("entered after compare, index now: %d\n", index);
+                                break;
+                            }
+                        }
+                        
+                        if(index == -1)
+                        {
+                            //printf("add new ip:%s  -- ipCount: %u\n", element, ipCount);
+                            strcpy(ip[ipCount], element);
+                            ++ipCount;
+                            index = ipCount;
+                        }
+                        dataset->features[(count * dataset->featuresColumns) + elemCount] = index;
+                        //printf("value of: %lf - at index: %d\n", dataset->features[(count * 10) + elemCount], (count * 10) + elemCount);
+                        ++elemCount;
+                        ++elemCountGlobal;
+                    } break;
+                    case 41:
+                    {
+                        uint8 index;
+                        if((strcmp(element, "normal") == 0))
+                        {
+                            index = 0;
+                        }else {
+                            index = 1;
+                        }
+                        
+                        for(uint8 iterator = 0; iterator < 2; ++iterator)
+                        {
+                            if(index == iterator)
+                            {
+                                dataset->labels[(count * 2) + iterator] = 1.00;
+                            }
+                        }
+                        elemCount = 0;
+                        elemCountGlobal = 0;
+                    }break;
+                    default:
+                    {
+                        //printf("count: %d -- elemCount: %d\n", count, elemCount);
+                        ++elemCountGlobal;
+                    }
+                }
+            
+                //printf("%s - %u\n", element, count);
+                //++count;
+                //++elemCountGlobal;
+                element = strtok_r(NULL, ",\n", &tempElement);
+                
+            }
+            elemCount = 0;
+            elemCountGlobal = 0;
+            ++count;
+         }
+        //printf("Number of features: %d", count);
+        //if(firstLine == 1) break;
+
+        firstLine = 1;
+    
+        line = strtok_r(NULL, "\n", &tempLine);
+    }
+
+    for(uint32 ips = 0; ips < 10000; ++ips)
+    {
+        free(ip[ips]);
+        ip[ips] = NULL;
+    }
+    free(ip);
+    ip = NULL;
+
+}
+
+void parseCsvData_less_features(pTcpString data, pCicDataset dataset)
+{
+    //TODO: make assigning of columns and rows dynamic.
+    dataset->features = malloc((sizeof *dataset->features) * data->lines * 10);
+    dataset->featuresColumns = 10;
+    dataset->labels = malloc((sizeof *dataset->labels) * data->lines * 2);
+    dataset->labelsColumns = 2;
+    dataset->rows = data->lines;
+    memset(dataset->labels, 0x00, (sizeof *dataset->labels) * data->lines * 2);
+
+    pSChar8 tempLine, tempElement;
+    pSChar8 line = strtok_r(data->data, "\n", &tempLine);
+    uint32 count = 0,
+          elemCount = 0,
+          elemCountGlobal = 0,
+          firstLine = 0,
+          ipCount = 0;
+
+    pSChar8 *ip = malloc((sizeof *ip) * 10000);
+    for(uint32 ipt = 0; ipt < 10000; ++ipt)
+    {
+        ip[ipt] = malloc((sizeof **ip) * 200);
+    }
+    while(line != NULL)
+    {
+        if(firstLine != 0)
+        {
+            pSChar8 element = strtok_r(line, ",\n", &tempElement);
+            while(element != NULL)
+            {
+                //printf("element before parsing: %s -- %d\n", element, elemCountGlobal);
+                switch(elemCountGlobal)
+                {
+                    case 3:
+                    case 5:
+                    case 6:
+                    case 7:
+                    case 8:
+                    case 15:
+                    case 19:
+                    case 9:
+                    {
+                        //printf("count: %d -- elemCount: %d\n", count, elemCount);
+                        dataset->features[(count * 10) + elemCount] = atof(element);
+                        ++elemCount;
+                        ++elemCountGlobal;
+                    } break;
+                    case 2:
+                    case 4:
+                    {
+                        //printf("element: %s\n", element);
+                        sint32 index = -1;
+                        for(uint32 it = 0; it < ipCount; ++it)
+                        {
+                            //printf("compare: %s with %s\n", ip[it], element);
+                            if(strcmp(ip[it], element) == 0)
+                            {
+                                index = it;
+                                //printf("entered after compare, index now: %d\n", index);
+                                break;
+                            }
+                        }
+                        
+                        if(index == -1)
+                        {
+                            //printf("add new ip:%s  -- ipCount: %u\n", element, ipCount);
+                            strcpy(ip[ipCount], element);
+                            ++ipCount;
+                            index = ipCount;
+                        }
+                        dataset->features[(count * 10) + elemCount] = index;
+                        //printf("value of: %lf - at index: %d\n", dataset->features[(count * 10) + elemCount], (count * 10) + elemCount);
+                        ++elemCount;
+                        ++elemCountGlobal;
+                    }break;
+                    case 87:
+                    {
+                        uint8 index;
+                        if((strcmp(element, "BENIGN") == 0))
+                        {
+                            index = 0;
+                        }
+                        else if((strcmp(element, "UDP") == 0) || (strcmp(element, "Syn") == 0) || (strcmp(element, "Portmap") == 0) ||
+                           (strcmp(element, "NetBIOS") == 0) || (strcmp(element, "MSSQL") == 0) || (strcmp(element, "LDAP") == 0) || (strcmp(element, "TFTP") == 0))
+                        {
+                            index = 1;
+                        }
+                        else if((strcmp(element, "DrDoS_DNS") == 0) || (strcmp(element, "DrDoS_LDAP") == 0) || (strcmp(element, "DrDoS_MSSQL") == 0) ||
+                           (strcmp(element, "DrDoS_NetBIOS") == 0) || (strcmp(element, "DrDoS_NTP") == 0) || (strcmp(element, "DrDoS_SNMP") == 0) ||
+                           (strcmp(element, "DrDoS_SSDP") == 0) || (strcmp(element, "DrDoS_UDP") == 0) || (strcmp(element, "UDPLag") == 0))
+                        {
+                            index = 1;
+                        }
+                        
+                        for(uint8 iterator = 0; iterator < 2; ++iterator)
+                        {
+                            if(index == iterator)
+                            {
+                                dataset->labels[(count * 2) + iterator] = 1.00;
+                            }
+                        }
+                        elemCount = 0;
+                        elemCountGlobal = 0;
+                    }break;
+                    default:
+                    {
+                        ++elemCountGlobal;
+                    }
+                }
+            
+                //printf("%s - %u\n", element, count);
+                //++count;
+                //++elemCountGlobal;
+                element = strtok_r(NULL, ",\n", &tempElement);
+                
+            }
+            elemCount = 0;
+            elemCountGlobal = 0;
+            ++count;
+         }
+        //printf("Number of features: %d", count);
+        firstLine = 1;
+        line = strtok_r(NULL, "\n", &tempLine);
+    }
+
+    for(uint32 ips = 0; ips < 10000; ++ips)
+    {
+        free(ip[ips]);
+        ip[ips] = NULL;
+    }
+    free(ip);
+    ip = NULL;
+}
 /*
 int main(void)
 {    
-    const pSChar8 source = "/home/catalin/Datasets/CIC_2019/03-11/Portmap.csv";
+    const pSChar8 source = "/home/catalin/Downloads/KDDCup99.csv";
     //const pSChar8 des = "/home/catalin/Disertatie/output.txt";
    
     tcpString data;
@@ -503,32 +768,32 @@ int main(void)
     }
     
     //printf("size: %lfMB - lines: %u\n", (double32)data.size / (1024*1024), data.lines);
-    parseCsvData(&data, &cic);
-    
+    //parseCsvData_less_features(&data, &cic);   
+    parseKDD(&data, &cic);
     for(uint32 it = 0; it < data.lines; ++it)
     {
-        for(uint32 it2 = 0; it2 < 60; ++it2)
+        for(uint32 it2 = 0; it2 < 41; ++it2)
         {
-            printf("%lf ", cic.features[(it * 60) + it2]);
+            printf("%lf ", cic.features[(it * 41) + it2]);
         }
         printf("\n\n\n");
     }
     
     normalizeCsvData(&cic, data.lines);
-    for(uint32 line = 0; line < data.lines; ++line)
+   for(uint32 line = 0; line < data.lines; ++line)
     {
-        for(uint32 column = 0; column < 60; ++column)
+        for(uint32 column = 0; column < 41; ++column)
         {
-            assert(!isnan(cic.features[(line * 60) + column]));
+            assert(!isnan(cic.features[(line * 41) + column]));
         }
     }
     
 
     for(uint32 it = 0; it < data.lines; ++it)
     {
-        for(uint32 it2 = 0; it2 < 60; ++it2)
+        for(uint32 it2 = 0; it2 < 41; ++it2)
         {
-            printf("%lf ", cic.features[(it * 60) + it2]);
+            printf("%lf ", cic.features[(it * 41) + it2]);
         }
         printf("\n\n\n");
     }

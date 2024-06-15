@@ -3,6 +3,7 @@
 
 #include "constants.h"
 #include "tensor.h"
+#include "activations.h"
 
 /**
  * @brief structure that represents a neuron of a
@@ -88,4 +89,8 @@ void initializeNetwork(pNetwork network);
 void printNetworkParameters(pNetwork network);
 void printLayerParameters(pLayer layer);
 void printNeuronParameters(pNeuron neuron);
+
+void feedforward(pLayer layer, pTensor data, activations layerActivation);
+void backpropagation(pNetwork network, pTensor actualValue);
+
 #endif /* NEURAL_NETWORK_HEADER */
